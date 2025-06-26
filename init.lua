@@ -1,4 +1,4 @@
-# Why? will impliment in c later
+-- Why? will impliment in c later
 
 
 local getgenv = getgenv or function() return _G end
