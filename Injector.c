@@ -11,7 +11,7 @@
 #include <dlfcn.h>
 #include <sys/user.h>
 
-pid_t findSoberPID() {
+pid_t findPID() {
     DIR* d = opendir("/proc");
     if (!d) return -1;
     struct dirent* e;
@@ -101,7 +101,7 @@ int injectSharedLib(pid_t pid, const char* soPath) {
 
 int main() {
     const char* test_so_path = "./sober_test_inject.so";
-    pid_t pid = findSoberPID();
+    pid_t pid = findPID();
     if (pid == -1) return EXIT_FAILURE;
     if (!injectSharedLib(pid, test_so_path)) return EXIT_FAILURE;
     printf("Injected %s into org.vinegarhq.Sober (PID %d)\n", test_so_path, pid);
