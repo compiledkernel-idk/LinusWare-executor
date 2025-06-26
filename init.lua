@@ -1,3 +1,4 @@
+# Why? will impliment in c later
 local getgenv = getgenv or function() return _G end
 local env = getgenv()
 
