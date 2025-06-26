@@ -10,4 +10,4 @@ Atingle on top
 
 ---
 
-![TeemsploitSoberExecutor](image.png)
+![TeemsploitSoberExecutor](https://github.com/AtingleTeam/AtingleExecutor/blob/main/Screenshot.png?raw=true)
