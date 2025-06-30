@@ -136,6 +136,19 @@ int inject_shared_library(pid_t target_pid, const char* library_path) {
     size_t library_path_len = strlen(library_path) + 1;
     size_t total_alloc_size = (library_path_len + 0xFFF) & ~0xFFF;
 
+    /* Maybe?
+    regs.rax = __NR_mmap;
+    regs.rdi = 0;
+    regs.rsi = total_alloc_size;
+    regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
+    regs.r10 = MAP_PRIVATE | MAP_ANONYMOUS;
+    regs.r8  = -1;
+    regs.r9  = 0;
+    regs.rsp -= sizeof(unsigned long);
+    ptrace(PTRACE_POKEDATA, target_pid, (void*)regs.rsp, (void*)original_regs.rip);
+    regs.rip = remote_mmap_addr;
+    */
+
     regs.rdi = 0;
     regs.rsi = total_alloc_size;
     regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -145,11 +158,13 @@ int inject_shared_library(pid_t target_pid, const char* library_path) {
     regs.rip = remote_mmap_addr;
 
     if (ptrace(PTRACE_SETREGS, target_pid, NULL, &regs) == -1) {
+        // perror("ptrace SETREGS");
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
     if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
+        // perror("ptrace CONT");
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
@@ -161,6 +176,7 @@ int inject_shared_library(pid_t target_pid, const char* library_path) {
     }
     void* remote_allocated_mem = (void*)regs.rax;
     if (remote_allocated_mem == MAP_FAILED) {
+        // fprintf(stderr, "remote mmap failed: %ld\n", (long)regs.rax);
         ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
@@ -169,6 +185,7 @@ int inject_shared_library(pid_t target_pid, const char* library_path) {
     struct iovec local_lib_path_io = { (void*)library_path, library_path_len };
     struct iovec remote_lib_path_io = { remote_allocated_mem, library_path_len };
     if (process_vm_writev(target_pid, &local_lib_path_io, 1, &remote_lib_path_io, 1, 0) == -1) {
+        // perror("process_vm_writev");
         ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
@@ -180,12 +197,14 @@ int inject_shared_library(pid_t target_pid, const char* library_path) {
     dlopen_regs.rip = remote_dlopen_addr;
 
     if (ptrace(PTRACE_SETREGS, target_pid, NULL, &dlopen_regs) == -1) {
+        // perror("ptrace SETREGS dlopen");
         ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
     if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
+        // perror("ptrace CONT dlopen");
         ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
         ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
