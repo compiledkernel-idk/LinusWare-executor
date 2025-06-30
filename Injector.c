@@ -10,23 +10,78 @@
 #include <sys/mman.h>
 #include <dlfcn.h>
 #include <sys/user.h>
+#include <errno.h>
+#include <limits.h>
 
-pid_t findPID() {
+unsigned long get_module_base_address(pid_t target_pid, const char *module_name) {
+    char maps_path[PATH_MAX];
+    snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", target_pid);
+
+    FILE *f = fopen(maps_path, "r");
+    if (!f) {
+        return 0;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        if (strstr(line, module_name)) {
+            unsigned long base_addr;
+            sscanf(line, "%lx-%*lx", &base_addr);
+            fclose(f);
+            return base_addr;
+        }
+    }
+    fclose(f);
+    return 0;
+}
+
+unsigned long get_symbol_offset_local(const char *local_lib_path, const char *symbol_name) {
+    void *handle = dlopen(local_lib_path, RTLD_LAZY);
+    if (!handle) {
+        return 0;
+    }
+
+    void *symbol_addr = dlsym(handle, symbol_name);
+    if (!symbol_addr) {
+        dlclose(handle);
+        return 0;
+    }
+
+    unsigned long local_lib_base = get_module_base_address(getpid(), local_lib_path);
+    if (local_lib_base == 0) {
+        dlclose(handle);
+        return 0;
+    }
+    
+    unsigned long offset = (unsigned long)symbol_addr - local_lib_base;
+    dlclose(handle);
+    return offset;
+}
+
+pid_t find_target_process_pid() {
     DIR* d = opendir("/proc");
-    if (!d) return -1;
+    if (!d) {
+        return -1;
+    }
+
     struct dirent* e;
     while ((e = readdir(d))) {
         if (e->d_type != DT_DIR) continue;
+
         pid_t pid = atoi(e->d_name);
         if (pid <= 0) continue;
 
-        char buf[512];
-        snprintf(buf, sizeof(buf), "/proc/%d/cmdline", pid);
-        FILE* f = fopen(buf, "r");
-        if (!f) continue;
-        fread(buf, 1, sizeof(buf), f);
-        fclose(f);
-        if (strstr(buf, "sober")) {
+        char exe_path[PATH_MAX];
+        char link_target[PATH_MAX];
+        snprintf(exe_path, sizeof(exe_path), "/proc/%d/exe", pid);
+
+        ssize_t len = readlink(exe_path, link_target, sizeof(link_target) - 1);
+        if (len == -1) {
+            continue;
+        }
+        link_target[len] = '\0';
+
+        if (strstr(link_target, "sober")) {
             closedir(d);
             return pid;
         }
@@ -35,75 +90,131 @@ pid_t findPID() {
     return -1;
 }
 
-int injectSharedLib(pid_t pid, const char* soPath) {
-    if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) return 0;
-    waitpid(pid, NULL, 0);
+int inject_shared_library(pid_t target_pid, const char* library_path) {
+    if (ptrace(PTRACE_ATTACH, target_pid, NULL, NULL) == -1) {
+        return 0;
+    }
+    waitpid(target_pid, NULL, 0);
 
-    size_t len = strlen(soPath) + 1;
+    struct user_regs_struct regs, original_regs;
+    if (ptrace(PTRACE_GETREGS, target_pid, NULL, &original_regs) == -1) {
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    memcpy(&regs, &original_regs, sizeof(regs));
 
-    void* handle = dlopen("libc.so.6", RTLD_LAZY);
-    void* mmapAddr = dlsym(handle, "mmap");
-    dlclose(handle);
-    if (!mmapAddr) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    unsigned long remote_libc_base = get_module_base_address(target_pid, "libc.so.6");
+    if (remote_libc_base == 0) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
-    struct user_regs_struct regs, backup;
-    ptrace(PTRACE_GETREGS, pid, NULL, &backup);
-    regs = backup;
+    unsigned long remote_libdl_base = get_module_base_address(target_pid, "libdl.so.2");
+    if (remote_libdl_base == 0) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+
+    unsigned long mmap_offset = get_symbol_offset_local("libc.so.6", "mmap");
+    if (mmap_offset == 0) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    unsigned long remote_mmap_addr = remote_libc_base + mmap_offset;
+
+    unsigned long dlopen_offset = get_symbol_offset_local("libdl.so.2", "dlopen");
+    if (dlopen_offset == 0) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    unsigned long remote_dlopen_addr = remote_libdl_base + dlopen_offset;
+
+    size_t library_path_len = strlen(library_path) + 1;
+    size_t total_alloc_size = (library_path_len + 0xFFF) & ~0xFFF;
 
     regs.rdi = 0;
-    regs.rsi = (len + 0x1000) & ~0xFFF;
+    regs.rsi = total_alloc_size;
     regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
-    regs.r10 = MAP_ANONYMOUS | MAP_PRIVATE;
+    regs.r10 = MAP_PRIVATE | MAP_ANONYMOUS;
     regs.r8 = -1;
     regs.r9 = 0;
-    regs.rax = (unsigned long)mmapAddr;
-    regs.rip = (unsigned long)mmapAddr;
+    regs.rip = remote_mmap_addr;
 
-    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
-    waitpid(pid, NULL, 0);
-
-    ptrace(PTRACE_GETREGS, pid, NULL, &regs);
-    void* remoteMem = (void*)regs.rax;
-
-    struct iovec local = { (void*)soPath, len };
-    struct iovec remote = { remoteMem, len };
-    if (process_vm_writev(pid, &local, 1, &remote, 1, 0) == -1) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &regs) == -1) {
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
-    handle = dlopen("libdl.so.2", RTLD_LAZY);
-    void* dlopenAddr = dlsym(handle, "dlopen");
-    dlclose(handle);
-    if (!dlopenAddr) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    waitpid(target_pid, NULL, 0);
+
+    if (ptrace(PTRACE_GETREGS, target_pid, NULL, &regs) == -1) {
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    void* remote_allocated_mem = (void*)regs.rax;
+    if (remote_allocated_mem == MAP_FAILED) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
-    regs = backup;
-    regs.rdi = (unsigned long)remoteMem;
-    regs.rsi = RTLD_NOW | RTLD_GLOBAL;
-    regs.rax = (unsigned long)dlopenAddr;
-    regs.rip = (unsigned long)dlopenAddr;
+    struct iovec local_lib_path_io = { (void*)library_path, library_path_len };
+    struct iovec remote_lib_path_io = { remote_allocated_mem, library_path_len };
+    if (process_vm_writev(target_pid, &local_lib_path_io, 1, &remote_lib_path_io, 1, 0) == -1) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
 
-    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
-    waitpid(pid, NULL, 0);
+    struct user_regs_struct dlopen_regs = original_regs;
+    dlopen_regs.rdi = (unsigned long)remote_allocated_mem;
+    dlopen_regs.rsi = RTLD_NOW | RTLD_GLOBAL;
+    dlopen_regs.rip = remote_dlopen_addr;
 
-    ptrace(PTRACE_SETREGS, pid, NULL, &backup);
-    ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &dlopen_regs) == -1) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+
+    if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
+        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+    waitpid(target_pid, NULL, 0);
+
+    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs) == -1) {
+        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+        return 0;
+    }
+
+    if (ptrace(PTRACE_DETACH, target_pid, NULL, NULL) == -1) {
+        return 0;
+    }
+
     return 1;
 }
 
 int main() {
-    const char* test_so_path = "./sober_test_inject.so";
-    pid_t pid = findPID();
-    if (pid == -1) return EXIT_FAILURE;
-    if (!injectSharedLib(pid, test_so_path)) return EXIT_FAILURE;
-    printf("Injected %s into org.vinegarhq.Sober (PID %d)\n", test_so_path, pid);
+    const char* target_shared_library_path = "./atingle.so";
+    
+    pid_t process_pid = find_target_process_pid();
+    if (process_pid == -1) {
+        return EXIT_FAILURE;
+    }
+
+    if (!inject_shared_library(process_pid, target_shared_library_path)) {
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
