@@ -1,13 +1,11 @@
 # Atingle Executor
 
-A third-party external script executor for Roblox designed specifically for the unofficial **Sober** Roblox client on Linux.
+Atingle Executor is an external script injector for the Sober Roblox client on Linux.
+This project was originally based on an abandoned version posted on v3rm. That version was never completed.
 
 ---
-
-v3rm thread said work stopped, this fork will finish the executor.
-
-Atingle on top
-
+Tested on Linux Mint XFCE
 ---
 
-![TeemsploitSoberExecutor](https://github.com/AtingleTeam/AtingleExecutor/blob/main/Screenshot.png?raw=true)
+Screenshot:  
+![screenshot](https://github.com/AtingleTeam/AtingleExecutor/blob/main/Screenshot.png?raw=true)
