@@ -4,27 +4,26 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
-#include <sys/ptrace.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
 #include <sys/mman.h>
 #include <dlfcn.h>
-#include <sys/user.h>
 #include <errno.h>
 #include <limits.h>
+#include <fcntl.h>
 
-unsigned long get_module_base_address(pid_t target_pid, const char *module_name) {
-    char maps_path[PATH_MAX];
-    snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", target_pid);
+unsigned long get_base_address(pid_t pid, const char *module) {
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "/proc/%d/maps", pid);
 
-    FILE *f = fopen(maps_path, "r");
+    FILE *f = fopen(path, "r");
     if (!f) {
         return 0;
     }
 
     char line[256];
     while (fgets(line, sizeof(line), f)) {
-        if (strstr(line, module_name)) {
+        if (strstr(line, module)) {
             unsigned long base_addr;
             sscanf(line, "%lx-%*lx", &base_addr);
             fclose(f);
@@ -35,30 +34,30 @@ unsigned long get_module_base_address(pid_t target_pid, const char *module_name)
     return 0;
 }
 
-unsigned long get_symbol_offset_local(const char *local_lib_path, const char *symbol_name) {
-    void *handle = dlopen(local_lib_path, RTLD_LAZY);
+unsigned long get_local_offset(const char *lib_path, const char *symbol) {
+    void *handle = dlopen(lib_path, RTLD_LAZY);
     if (!handle) {
         return 0;
     }
 
-    void *symbol_addr = dlsym(handle, symbol_name);
+    void *symbol_addr = dlsym(handle, symbol);
     if (!symbol_addr) {
         dlclose(handle);
         return 0;
     }
 
-    unsigned long local_lib_base = get_module_base_address(getpid(), local_lib_path);
-    if (local_lib_base == 0) {
+    unsigned long local_base = get_base_address(getpid(), lib_path);
+    if (local_base == 0) {
         dlclose(handle);
         return 0;
     }
     
-    unsigned long offset = (unsigned long)symbol_addr - local_lib_base;
+    unsigned long offset = (unsigned long)symbol_addr - local_base;
     dlclose(handle);
     return offset;
 }
 
-pid_t find_target_process_pid() {
+pid_t find_pid(const char *target_name) {
     DIR* d = opendir("/proc");
     if (!d) {
         return -1;
@@ -81,7 +80,7 @@ pid_t find_target_process_pid() {
         }
         link_target[len] = '\0';
 
-        if (strstr(link_target, "sober")) {
+        if (strstr(link_target, target_name)) {
             closedir(d);
             return pid;
         }
@@ -89,149 +88,62 @@ pid_t find_target_process_pid() {
     closedir(d);
     return -1;
 }
-
-int inject_shared_library(pid_t target_pid, const char* library_path) {
-    if (ptrace(PTRACE_ATTACH, target_pid, NULL, NULL) == -1) {
-        return 0;
-    }
-    waitpid(target_pid, NULL, 0);
-
-    struct user_regs_struct regs, original_regs;
-    if (ptrace(PTRACE_GETREGS, target_pid, NULL, &original_regs) == -1) {
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-    memcpy(&regs, &original_regs, sizeof(regs));
-
-    unsigned long remote_libc_base = get_module_base_address(target_pid, "libc.so.6");
+// should work better for now
+int inject(pid_t pid, const char* library_path) {
+    unsigned long remote_libc_base = get_base_address(pid, "libc.so.6");
     if (remote_libc_base == 0) {
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
-    unsigned long remote_libdl_base = get_module_base_address(target_pid, "libdl.so.2");
+    unsigned long remote_libdl_base = get_base_address(pid, "libdl.so.2");
     if (remote_libdl_base == 0) {
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
 
-    unsigned long mmap_offset = get_symbol_offset_local("libc.so.6", "mmap");
+    unsigned long mmap_offset = get_local_offset("libc.so.6", "mmap");
     if (mmap_offset == 0) {
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
     unsigned long remote_mmap_addr = remote_libc_base + mmap_offset;
 
-    unsigned long dlopen_offset = get_symbol_offset_local("libdl.so.2", "dlopen");
+    unsigned long dlopen_offset = get_local_offset("libdl.so.2", "dlopen");
     if (dlopen_offset == 0) {
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
         return 0;
     }
     unsigned long remote_dlopen_addr = remote_libdl_base + dlopen_offset;
 
     size_t library_path_len = strlen(library_path) + 1;
-    size_t total_alloc_size = (library_path_len + 0xFFF) & ~0xFFF;
+    size_t total_alloc_size = (library_path_len + 0xFFF + 0x1000) & ~0xFFF;
 
-    /* Maybe?
-    regs.rax = __NR_mmap;
-    regs.rdi = 0;
-    regs.rsi = total_alloc_size;
-    regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
-    regs.r10 = MAP_PRIVATE | MAP_ANONYMOUS;
-    regs.r8  = -1;
-    regs.r9  = 0;
-    regs.rsp -= sizeof(unsigned long);
-    ptrace(PTRACE_POKEDATA, target_pid, (void*)regs.rsp, (void*)original_regs.rip);
-    regs.rip = remote_mmap_addr;
-    */
+    void* remote_mem_placeholder = (void*)0x000000; // Placeholder
 
-    regs.rdi = 0;
-    regs.rsi = total_alloc_size;
-    regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
-    regs.r10 = MAP_PRIVATE | MAP_ANONYMOUS;
-    regs.r8 = -1;
-    regs.r9 = 0;
-    regs.rip = remote_mmap_addr;
-
-    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &regs) == -1) {
-        // perror("ptrace SETREGS");
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+    if (remote_mem_placeholder == NULL || remote_mem_placeholder == MAP_FAILED) {
         return 0;
     }
 
-    if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
-        // perror("ptrace CONT");
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-    waitpid(target_pid, NULL, 0);
-
-    if (ptrace(PTRACE_GETREGS, target_pid, NULL, &regs) == -1) {
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-    void* remote_allocated_mem = (void*)regs.rax;
-    if (remote_allocated_mem == MAP_FAILED) {
-        // fprintf(stderr, "remote mmap failed: %ld\n", (long)regs.rax);
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
+    struct iovec local_path_io = { (void*)library_path, library_path_len };
+    struct iovec remote_path_io = { remote_mem_placeholder, library_path_len };
+    if (process_vm_writev(pid, &local_path_io, 1, &remote_path_io, 1, 0) == -1) {
         return 0;
     }
 
-    struct iovec local_lib_path_io = { (void*)library_path, library_path_len };
-    struct iovec remote_lib_path_io = { remote_allocated_mem, library_path_len };
-    if (process_vm_writev(target_pid, &local_lib_path_io, 1, &remote_lib_path_io, 1, 0) == -1) {
-        // perror("process_vm_writev");
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-
-    struct user_regs_struct dlopen_regs = original_regs;
-    dlopen_regs.rdi = (unsigned long)remote_allocated_mem;
-    dlopen_regs.rsi = RTLD_NOW | RTLD_GLOBAL;
-    dlopen_regs.rip = remote_dlopen_addr;
-
-    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &dlopen_regs) == -1) {
-        // perror("ptrace SETREGS dlopen");
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-
-    if (ptrace(PTRACE_CONT, target_pid, NULL, NULL) == -1) {
-        // perror("ptrace CONT dlopen");
-        ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs);
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-    waitpid(target_pid, NULL, 0);
-
-    if (ptrace(PTRACE_SETREGS, target_pid, NULL, &original_regs) == -1) {
-        ptrace(PTRACE_DETACH, target_pid, NULL, NULL);
-        return 0;
-    }
-
-    if (ptrace(PTRACE_DETACH, target_pid, NULL, NULL) == -1) {
-        return 0;
-    }
+    void* remote_shellcode_addr = remote_mem_placeholder + library_path_len; // mmap and dlopen
 
     return 1;
 }
 
-int main() {
-    const char* target_shared_library_path = "./atingle.so";
-    
-    pid_t process_pid = find_target_process_pid();
-    if (process_pid == -1) {
+int main(int argc, char *argv[]) {
+    const char* target_lib_path = "./atingle.so";
+    if (argc > 1) {
+        target_lib_path = argv[1];
+    }
+
+    pid_t game_pid = find_pid("sober");
+    if (game_pid == -1) {
         return EXIT_FAILURE;
     }
 
-    if (!inject_shared_library(process_pid, target_shared_library_path)) {
+    if (!inject(game_pid, target_lib_path)) {
         return EXIT_FAILURE;
     }
 
