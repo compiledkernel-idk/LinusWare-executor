@@ -5,103 +5,51 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
-#include <sys/ptrace.h>
-#include <sys/wait.h>
-#include <sys/uio.h>
-#include <sys/mman.h>
-#include <dlfcn.h>
-#include <sys/user.h>
+// #include <sys/ptrace.h>
+// #include <sys/wait.h_
+// #include <sys/uio.h>
+// #include <sys/mman.h>
+// #include <dlfcn.h>
+// #include <sys/user.h>
+// #include <errno.h>
+// #include <limits.h>
+// #include <fcntl.h>
 #include <pthread.h>
+#include <glib.h>
 
 static GtkWidget *main_window;
 static GtkWidget *editor;
 
-pid_t findPID() {
+pid_t findPID(const char *target_name) {
     DIR* d = opendir("/proc");
-    if (!d) return -1;
+    if (!d) {
+        g_printerr("Error: Could not open /proc directory.\n");
+        return -1;
+    }
+
     struct dirent* e;
     while ((e = readdir(d))) {
         if (e->d_type != DT_DIR) continue;
+
         pid_t pid = atoi(e->d_name);
         if (pid <= 0) continue;
 
-        char buf[512];
-        snprintf(buf, sizeof(buf), "/proc/%d/cmdline", pid);
-        FILE* f = fopen(buf, "r");
-        if (!f) continue;
-        fread(buf, 1, sizeof(buf), f);
-        fclose(f);
-        if (strstr(buf, "sober")) {
+        char exe_path[PATH_MAX];
+        char link_target[PATH_MAX];
+        snprintf(exe_path, sizeof(exe_path), "/proc/%d/exe", pid);
+
+        ssize_t len = readlink(exe_path, link_target, sizeof(link_target) - 1);
+        if (len == -1) continue;
+        link_target[len] = '\0';
+
+        if (strstr(link_target, target_name)) {
             closedir(d);
             return pid;
         }
     }
     closedir(d);
+    g_printerr("Error: Process with name containing '%s' not found.\n", target_name);
     return -1;
-}
-
-int injectSharedLib(pid_t pid, const char* soPath) {
-    if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) return 0;
-    waitpid(pid, NULL, 0);
-
-    size_t len = strlen(soPath) + 1;
-
-    void* handle = dlopen("libc.so.6", RTLD_LAZY);
-    void* mmapAddr = dlsym(handle, "mmap");
-    dlclose(handle);
-    if (!mmapAddr) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
-        return 0;
-    }
-
-    struct user_regs_struct regs, backup;
-    ptrace(PTRACE_GETREGS, pid, NULL, &backup);
-    regs = backup;
-
-    regs.rdi = 0;
-    regs.rsi = (len + 0x1000) & ~0xFFF;
-    regs.rdx = PROT_READ | PROT_WRITE | PROT_EXEC;
-    regs.r10 = MAP_ANONYMOUS | MAP_PRIVATE;
-    regs.r8 = -1;
-    regs.r9 = 0;
-    regs.rax = (unsigned long)mmapAddr;
-    regs.rip = (unsigned long)mmapAddr;
-
-    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
-    waitpid(pid, NULL, 0);
-
-    ptrace(PTRACE_GETREGS, pid, NULL, &regs);
-    void* remoteMem = (void*)regs.rax;
-
-    struct iovec local = { (void*)soPath, len };
-    struct iovec remote = { remoteMem, len };
-    if (process_vm_writev(pid, &local, 1, &remote, 1, 0) == -1) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
-        return 0;
-    }
-
-    handle = dlopen("libdl.so.2", RTLD_LAZY);
-    void* dlopenAddr = dlsym(handle, "dlopen");
-    dlclose(handle);
-    if (!dlopenAddr) {
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
-        return 0;
-    }
-
-    regs = backup;
-    regs.rdi = (unsigned long)remoteMem;
-    regs.rsi = RTLD_NOW | RTLD_GLOBAL;
-    regs.rax = (unsigned long)dlopenAddr;
-    regs.rip = (unsigned long)dlopenAddr;
-
-    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
-    waitpid(pid, NULL, 0);
-
-    ptrace(PTRACE_SETREGS, pid, NULL, &backup);
-    ptrace(PTRACE_DETACH, pid, NULL, NULL);
-    return 1;
 }
 
 char* load_file_to_string(const char *filename) {
@@ -209,7 +157,9 @@ static gboolean update_button_label(gpointer user_data) {
 static void* attach_thread_func(void *arg) {
     struct attach_data *data = arg;
     const char* so_path = "./sober_test_inject.so";
-    pid_t pid = findPID();
+    const char* injector_path = "./injector";
+
+    pid_t pid = findPID("sober");
     if (pid == -1) {
         struct label_update_data *upd = g_new(struct label_update_data, 1);
         upd->button = data->button;
@@ -218,19 +168,67 @@ static void* attach_thread_func(void *arg) {
         g_free(data);
         return NULL;
     }
-    if (!injectSharedLib(pid, so_path)) {
+
+    g_print("Attempting to run injector for PID %d with library %s\n", pid, so_path);
+
+    gchar *stdout_buf = NULL;
+    gchar *stderr_buf = NULL;
+    gint exit_status = 0;
+    GError *error = NULL;
+
+    gchar *pid_str = g_strdup_printf("%d", pid);
+    gchar *argv[] = { (gchar*)injector_path, pid_str, (gchar*)so_path, NULL };
+
+    gboolean success = g_spawn_sync(
+        NULL,
+        argv,
+        NULL,
+        G_SPAWN_SEARCH_PATH,
+        NULL, NULL,
+        &stdout_buf,
+        &stderr_buf,
+        &exit_status,
+        &error
+    );
+
+    g_free(pid_str);
+
+    if (error) {
+        g_printerr("Error running injector: %s\n", error->message);
+        g_error_free(error);
+        struct label_update_data *upd = g_new(struct label_update_data, 1);
+        upd->button = data->button;
+        upd->new_label = g_strdup("Attach (Exec Error)");
+        g_idle_add(update_button_label, upd);
+        g_free(data);
+        return NULL;
+    }
+
+    if (!success || exit_status != 0) {
+        g_printerr("injector failed. Exit status: %d\n", exit_status);
+        if (stdout_buf) g_print("Injector stdout:\n%s\n", stdout_buf);
+        if (stderr_buf) g_printerr("Injector stderr:\n%s\n", stderr_buf);
         struct label_update_data *upd = g_new(struct label_update_data, 1);
         upd->button = data->button;
         upd->new_label = g_strdup("Attach (Failed)");
         g_idle_add(update_button_label, upd);
         g_free(data);
+        g_free(stdout_buf);
+        g_free(stderr_buf);
         return NULL;
     }
+
+    g_print("injector ran successfully.\n");
+    if (stdout_buf) g_print("Injector stdout:\n%s\n", stdout_buf);
+    if (stderr_buf) g_printerr("Injector stderr:\n%s\n", stderr_buf);
+
     struct label_update_data *upd = g_new(struct label_update_data, 1);
     upd->button = data->button;
     upd->new_label = g_strdup("Attach (Success)");
     g_idle_add(update_button_label, upd);
     g_free(data);
+    g_free(stdout_buf);
+    g_free(stderr_buf);
     return NULL;
 }
 
