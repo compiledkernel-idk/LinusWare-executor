@@ -18,9 +18,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define IPC_READY_PATH "/dev/shm/sirracha_ready"
-#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
-#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
+#define IPC_READY_PATH "/tmp/sirracha_ready"
+#define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
+#define IPC_OUT_PATH "/tmp/sirracha_output.txt"
 #define IPC_LIB_PATH "/dev/shm/sirracha.so"
 
 static GtkWidget *window;
@@ -154,7 +154,39 @@ static int send_script(const char *script) {
   fclose(f);
   chmod(IPC_EXEC_PATH, 0666);
 
+  // Also copy to container's /tmp if we have a target PID
+  if (target_pid > 0) {
+    char *container_exec_path =
+        g_strdup_printf("/proc/%d/root/tmp/sirracha_exec.txt", target_pid);
+    FILE *cf = fopen(container_exec_path, "w");
+    if (cf) {
+      fprintf(cf, "%s", script);
+      fclose(cf);
+      chmod(container_exec_path, 0666);
+    }
+    g_free(container_exec_path);
+  }
+
   for (int i = 0; i < 100; i++) { // 10s timeout
+    // Check container output first
+    if (target_pid > 0) {
+      char *container_out_path =
+          g_strdup_printf("/proc/%d/root/tmp/sirracha_output.txt", target_pid);
+      if (access(container_out_path, F_OK) == 0) {
+        g_usleep(50000);
+        char *out;
+        if (g_file_get_contents(container_out_path, &out, NULL, NULL)) {
+          log_console(out);
+          g_free(out);
+          unlink(container_out_path);
+          g_free(container_out_path);
+          return 0;
+        }
+      }
+      g_free(container_out_path);
+    }
+
+    // Check host output (fallback)
     if (access(IPC_OUT_PATH, F_OK) == 0) {
       g_usleep(50000);
       char *out;
@@ -331,13 +363,28 @@ static void attach_thread(GTask *task, gpointer s, gpointer d,
 
     log_async("Waiting for Ready Signal...");
     for (int i = 0; i < 30; i++) {
-      if (access(IPC_READY_PATH, F_OK) == 0) {
+      // Check container path via /proc (primary method for Flatpak)
+      char *container_ready_path =
+          g_strdup_printf("/proc/%d/root/tmp/sirracha_ready", pid);
+      if (access(container_ready_path, F_OK) == 0) {
         target_pid = pid;
         g_idle_add((GSourceFunc)set_status, "Attached");
         g_idle_add((GSourceFunc)gtk_widget_set_sensitive, exec_btn);
         log_async("Ready Signal Received!");
+        g_free(container_ready_path);
         return;
       }
+      g_free(container_ready_path);
+
+      // Fallback: check host path (for non-containerized processes)
+      if (access(IPC_READY_PATH, F_OK) == 0) {
+        target_pid = pid;
+        g_idle_add((GSourceFunc)set_status, "Attached");
+        g_idle_add((GSourceFunc)gtk_widget_set_sensitive, exec_btn);
+        log_async("Ready Signal Received (host)!");
+        return;
+      }
+
       sleep(1);
     }
 

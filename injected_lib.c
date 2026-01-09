@@ -33,11 +33,11 @@
 
 #include "luau_api.h"
 
-#define LOG_PATH "/dev/shm/sirracha_debug.log"
-#define IPC_READY_PATH "/dev/shm/sirracha_ready"
-#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
-#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
-#define IPC_CMD_PATH "/dev/shm/sirracha_cmd.txt"
+#define LOG_PATH "/tmp/sirracha_debug.log"
+#define IPC_READY_PATH "/tmp/sirracha_ready"
+#define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
+#define IPC_OUT_PATH "/tmp/sirracha_output.txt"
+#define IPC_CMD_PATH "/tmp/sirracha_cmd.txt"
 
 static volatile int g_running = 1;
 static pthread_t g_worker_thread;
@@ -413,7 +413,7 @@ int execute_script(luau_api_t *api, const char *script, char *output,
              "Lua state: %p\n"
              "\n"
              "Manual reverse engineering is needed to find function offsets.\n"
-             "Check the debug log at /dev/shm/sirracha_debug.log",
+             "Check the debug log at /tmp/sirracha_debug.log",
              api->functions_resolved, api->sober_base, (void *)api->L);
     return -1;
   }
@@ -598,7 +598,7 @@ void *worker_thread_func(void *arg) {
           extern int scan_all_strings(luau_api_t * api);
           int found = scan_all_strings(&g_api);
           write_output("Scanned for Lua strings: found %d\n"
-                       "Check /dev/shm/sirracha_debug.log for details",
+                       "Check /tmp/sirracha_debug.log for details",
                        found);
         } else if (strcmp(script, "__DISCOVER__") == 0) {
 
@@ -607,7 +607,7 @@ void *worker_thread_func(void *arg) {
                        "This may take a moment. Check debug log for results.");
           int found = aggressive_function_discovery(&g_api);
           write_output("Discovery complete: %d potential functions found.\n"
-                       "See /dev/shm/sirracha_debug.log for details.",
+                       "See /tmp/sirracha_debug.log for details.",
                        found);
         } else if (strcmp(script, "__SAFEPROBE__") == 0) {
 
@@ -616,7 +616,7 @@ void *worker_thread_func(void *arg) {
                        "Scanning for function prologues in code regions...");
           int found = safe_function_discovery(&g_api);
           write_output("Safe probe complete: %d functions found.\n"
-                       "Check /dev/shm/sirracha_debug.log for offsets.",
+                       "Check /tmp/sirracha_debug.log for offsets.",
                        found);
         } else if (strcmp(script, "__ROBLOX__") == 0) {
 
@@ -639,7 +639,7 @@ void *worker_thread_func(void *arg) {
           } else {
             write_output(
                 "Failed to find DataModel. Offsets may need adjustment.\n"
-                "Check /dev/shm/sirracha_debug.log for details.");
+                "Check /tmp/sirracha_debug.log for details.");
           }
         } else {
 

@@ -374,8 +374,32 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
   regs.rsi = RTLD_NOW | RTLD_GLOBAL;
   regs.rip = target_dlopen;
 
+  // Search for an 'int 3' (0xCC) instruction in the target's executable memory
+  // This allows us to trap cleanly instead of causing a SEGFAULT at 0xDEADBEEF
+  unsigned long int3_addr = 0;
+  unsigned long exec_start = find_exec_region(pid);
+
+  if (exec_start > 0) {
+    for (int off = 0; off < 4096; off += sizeof(long)) {
+      long data = ptrace(PTRACE_PEEKTEXT, pid, exec_start + off, NULL);
+      unsigned char *bytes = (unsigned char *)&data;
+      for (int b = 0; b < sizeof(long); b++) {
+        if (bytes[b] == 0xCC) {
+          int3_addr = exec_start + off + b;
+          break;
+        }
+      }
+      if (int3_addr)
+        break;
+    }
+  }
+
+  // Fallback to 0 (will cause SIGSEGV) if no int3 found
+  unsigned long return_addr = int3_addr ? int3_addr : 0;
+  printf("[*] Return address (trap): 0x%lx\n", return_addr);
+
   regs.rsp -= 8;
-  ptrace(PTRACE_POKEDATA, pid, regs.rsp, 0xDEADBEEF);
+  ptrace(PTRACE_POKEDATA, pid, regs.rsp, return_addr);
 
   ptrace(PTRACE_SETREGS, pid, NULL, &regs);
   printf("[*] Executing dlopen...\n");
@@ -386,6 +410,9 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
   if (WIFSTOPPED(status)) {
     printf("[+] Process stopped (signal %d)\n", WSTOPSIG(status));
   }
+
+  // If we stopped due to SIGSEGV (because we used 0) or SIGTRAP (int3), it's
+  // good. We need to handle both gracefully.
 
   ptrace(PTRACE_GETREGS, pid, NULL, &regs);
   printf("[*] dlopen returned: 0x%llx\n", regs.rax);
@@ -474,28 +501,94 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
     pid = tracer;
   }
 
+  // First, copy the library into a location the target can access
+  // For Flatpak, /tmp is often shared or we staged it there via /proc
   char tmp_lib[256];
-  snprintf(tmp_lib, sizeof(tmp_lib), "/tmp/sirracha_inject_%d.so", getpid());
 
-  char cp_cmd[512];
-  snprintf(cp_cmd, sizeof(cp_cmd), "cp '%s' '%s' && chmod 755 '%s'", lib_path,
-           tmp_lib, tmp_lib);
-  if (system(cp_cmd) != 0) {
-    printf("[!] Failed to copy library to /tmp\n");
-    return -1;
+  if (strncmp(lib_path, "/tmp/", 5) == 0) {
+    // Already in /tmp (staged by script), just use it
+    strncpy(tmp_lib, lib_path, sizeof(tmp_lib));
+    printf("[*] Library already in /tmp, skipping copy\n");
+  } else {
+    snprintf(tmp_lib, sizeof(tmp_lib), "/tmp/sirracha_inject_%d.so", getpid());
+
+    char cp_cmd[512];
+    snprintf(cp_cmd, sizeof(cp_cmd), "cp '%s' '%s' && chmod 755 '%s'", lib_path,
+             tmp_lib, tmp_lib);
+    if (system(cp_cmd) != 0) {
+      printf("[!] Failed to copy library to /tmp\n");
+      return -1;
+    }
+    printf("[*] Library copied to %s\n", tmp_lib);
   }
-  printf("[*] Library copied to %s\n", tmp_lib);
 
+  // Copy OURSELF (the injector binary) to the container's /tmp via /proc
+  char self_path[PATH_MAX];
+  ssize_t len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+  if (len != -1) {
+    self_path[len] = '\0';
+
+    // Path inside the container
+    char container_injector_path[256];
+    snprintf(container_injector_path, sizeof(container_injector_path),
+             "/tmp/injector_%d", getpid());
+
+    // Path on the host (via /proc)
+    char host_access_path[512];
+    snprintf(host_access_path, sizeof(host_access_path), "/proc/%d/root%s", pid,
+             container_injector_path);
+
+    // Check if /proc mount is writable/accessible
+    if (access(host_access_path, F_OK) == 0 || errno == ENOENT) {
+      // Copy to host_access_path
+      char cp_exe_cmd[1024];
+      snprintf(cp_exe_cmd, sizeof(cp_exe_cmd), "cp '%s' '%s' && chmod 755 '%s'",
+               self_path, host_access_path, host_access_path);
+
+      if (system(cp_exe_cmd) != 0) {
+        // Fallback to host /tmp if proc access fails (rare but possible)
+        snprintf(host_access_path, sizeof(host_access_path), "/tmp/injector_%d",
+                 getpid());
+        snprintf(cp_exe_cmd, sizeof(cp_exe_cmd),
+                 "cp '%s' '%s' && chmod 755 '%s'", self_path, host_access_path,
+                 host_access_path);
+        system(cp_exe_cmd);
+      }
+    }
+
+    // Now run THIS copy inside nsenter
+    char cmd[4096];
+    // Use internal ptrace mode
+    snprintf(cmd, sizeof(cmd),
+             "nsenter -t %d -m -p -U --preserve-credentials '%s' auto '%s'",
+             pid, container_injector_path, tmp_lib);
+
+    printf("[*] recursive-inject: Running %s inside container...\n", cmd);
+    int ret = system(cmd);
+
+    // Cleanup
+    char rm_cmd[512];
+    snprintf(rm_cmd, sizeof(rm_cmd), "rm -f '%s'", host_access_path);
+    // system(rm_cmd); // Keep for debugging if needed, or uncomment
+
+    if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0) {
+      return 0;
+    }
+    printf("[!] recursive-inject failed with code %d\n", WEXITSTATUS(ret));
+  } else {
+    printf("[!] Could not find self path for recursive injection\n");
+  }
+
+  // Fallback to GDB if recursive failed
+  printf("[*] Falling back to GDB inside nsenter...\n");
   char cmd[4096];
   snprintf(cmd, sizeof(cmd),
-           "nsenter -t %d -m -p -U --preserve-credentials "
-           "gdb -batch -n "
-           "-ex 'set pagination off' "
-           "-ex 'set confirm off' "
+           "nsenter -t %d -m -p -U --preserve-credentials gdb -q -batch "
            "-ex 'attach %d' "
+           "-ex 'set confirm off' "
            "-ex 'call (void*)dlopen(\"%s\", 2)' "
            "-ex 'detach' "
-           "-ex 'quit' 2>&1",
+           "-ex 'quit'",
            pid, pid, tmp_lib);
 
   printf("[*] Running: nsenter + gdb\n");
@@ -565,39 +658,50 @@ int main(int argc, char **argv) {
   const char *lib_path;
 
   if (argc >= 2) {
-    pid = atoi(argv[1]);
-    if (pid <= 0) {
-      fprintf(stderr, "[!] Invalid PID: %s\n", argv[1]);
-      return EXIT_FAILURE;
+    if (strcmp(argv[1], "auto") == 0 || strcmp(argv[1], "0") == 0) {
+      pid = 0; // Trigger auto-scan
+    } else {
+      pid = atoi(argv[1]);
     }
+
     lib_path = (argc > 2) ? argv[2] : "./sober_test_inject.so";
   } else {
-    printf("[*] Searching for 'sober' process...\n");
+    // defaults
+    pid = 0;
+    lib_path = "./sober_test_inject.so";
+  }
+
+  if (pid <= 0) {
+    printf("[*] Searching for 'sober' process (auto-scan)...\n");
     pid = find_pid("sober");
     if (pid == -1) {
       fprintf(stderr, "[!] Sober process not found\n");
       return EXIT_FAILURE;
     }
-    lib_path = "./sober_test_inject.so";
+    printf("[*] Found Sober at PID %d\n", pid);
   }
 
   // Get absolute path or verify container path
   char abs_path[PATH_MAX];
-  if (realpath(lib_path, abs_path) == NULL) {
-    // If realpath fails on host, check if it exists in target's root
-    // (Container/Flatpak support)
+
+  // Trust paths staged by our script in /tmp
+  if (strncmp(lib_path, "/tmp/sirracha", 13) == 0) {
+    strncpy(abs_path, lib_path, sizeof(abs_path));
+    printf("[*] Trusting staged container path: %s\n", abs_path);
+  } else if (realpath(lib_path, abs_path) == NULL) {
+    // If realpath fails on host, checking target root might also fail due to
+    // permissions But we'll try one last check
     char container_path[PATH_MAX];
     snprintf(container_path, sizeof(container_path), "/proc/%d/root%s", pid,
              lib_path);
 
     if (access(container_path, F_OK) == 0) {
-      // File exists in container! Use the provided path as-is.
       strncpy(abs_path, lib_path, sizeof(abs_path));
       printf("[*] Library found in container filesystem: %s\n", abs_path);
     } else {
-      fprintf(stderr, "[!] Library not found on host or in container: %s\n",
-              lib_path);
-      return EXIT_FAILURE;
+      printf("[!] Warning: Could not verify library path on host. Attempting "
+             "anyway...\n");
+      strncpy(abs_path, lib_path, sizeof(abs_path));
     }
   }
 
