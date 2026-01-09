@@ -32,7 +32,9 @@ if [ ! -d "/proc/$PID" ]; then
 fi
 
 # Relax Yama ptrace restriction
-echo 0 > /proc/sys/kernel/yama/ptrace_scope 2>/dev/null
+if [ -f /proc/sys/kernel/yama/ptrace_scope ]; then
+    echo 0 > /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || true
+fi
 
 # Follow tracer chain to find root process
 MAX_DEPTH=10
@@ -53,7 +55,7 @@ while [ $DEPTH -lt $MAX_DEPTH ]; do
         kill -9 "$TRACER" 2>/dev/null
         sleep 0.5
         break
-    elif [[ "$TRACER_NAME" == "sober" ]]; then
+    elif [[ "$TRACER_NAME" == "sober" ]] || [[ "$TRACER_NAME" == "bwrap" ]]; then
         echo "Following tracer chain to parent..."
         PID=$TRACER
         DEPTH=$((DEPTH + 1))
@@ -75,15 +77,34 @@ if grep -q "sirracha" "/proc/$PID/maps" 2>/dev/null; then
     exit 0
 fi
 
-GDB_OUTPUT=$(gdb -q -batch \
-    -ex "set sysroot /proc/$PID/root" \
-    -ex "attach $PID" \
-    -ex "set confirm off" \
-    -ex "call (void*)dlopen(\"$LIB_PATH\", 2)" \
-    -ex "detach" \
-    -ex "quit" 2>&1)
+# Try nsenter-based injection (fixes namespace mismatch in Flatpak)
+echo "Attempting namespace-aware injection..."
+
+# Copy lib to /tmp so it's accessible from different namespaces (Flatpak shares /tmp)
+TMP_LIB="/tmp/sirracha_$(date +%s).so"
+cp "$LIB_PATH" "$TMP_LIB"
+chmod 666 "$TMP_LIB"
+
+# GDB Command with nsenter fallback
+GDB_CMD="gdb -q -batch -ex \"attach $PID\" -ex \"set confirm off\" -ex \"call (void*)dlopen(\\\"$TMP_LIB\\\", 2)\" -ex \"detach\" -ex \"quit\""
+
+# First try with nsenter
+GDB_OUTPUT=$(nsenter -t "$PID" -m -p -U --preserve-credentials bash -c "$GDB_CMD" 2>&1)
+
+# If nsenter fails or gdb failed inside, try direct gdb as fallback
+if [[ $? -ne 0 ]] || echo "$GDB_OUTPUT" | grep -qi "error"; then
+    echo "nsenter injection issue, trying direct gdb fallback..."
+    GDB_OUTPUT=$(gdb -q -batch \
+        -ex "set sysroot /proc/$PID/root" \
+        -ex "attach $PID" \
+        -ex "set confirm off" \
+        -ex "call (void*)dlopen(\"$TMP_LIB\", 2)" \
+        -ex "detach" \
+        -ex "quit" 2>&1)
+fi
 
 GDB_EXIT=$?
+rm -f "$TMP_LIB"
 
 echo "$GDB_OUTPUT" >> /dev/shm/sirracha_gdb.log 2>/dev/null
 
