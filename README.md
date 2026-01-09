@@ -13,7 +13,7 @@ Roblox script executor for Linux. Targets the Sober client (Flatpak).
 
 ## Requirements
 
-- Linux (tested on Fedora, should work on Ubuntu/Debian)
+- Linux (tested on Arch Linux, should work on Ubuntu/Debian)
 - GTK4 and GtkSourceView 5
 - Sober (Flatpak Roblox client)
 
