@@ -99,10 +99,11 @@ else
 fi
 
 # TRY BINARY INJECTOR FIRST (Robust Ptrace Method)
-if [ -f "./injector" ]; then
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/injector" ]; then
     echo "Using optimized binary injector..."
-    chmod +x ./injector
-    ./injector "$PID" "$USED_PATH"
+    chmod +x "$SCRIPT_DIR/injector"
+    "$SCRIPT_DIR/injector" "$PID" "$USED_PATH"
     RET=$?
     
     if [ $RET -eq 0 ]; then

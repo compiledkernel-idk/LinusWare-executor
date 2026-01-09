@@ -504,7 +504,8 @@ int luau_api_init(luau_api_t *api) {
   log_debug("PID: %d\n", getpid());
   log_debug("===========================================\n");
 
-  unlockbreaker();
+  // unlockbreaker(); // Disabled to prevent crash caused by detaching internal
+  // tracers
 
   api->sober_base = find_sober_base();
   if (!api->sober_base) {
@@ -566,6 +567,9 @@ static void probe_functions(void) {
 
 void *worker_thread_func(void *arg) {
   (void)arg;
+
+  // Wait for injector to detach and process to stabilize
+  sleep(1);
 
   if (luau_api_init(&g_api) < 0) {
     log_debug("Failed to initialize Luau API\n");
