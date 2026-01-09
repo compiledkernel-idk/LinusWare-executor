@@ -5,8 +5,8 @@
  * Copyright (c) 2026 compiledkernel-idk
  * All Rights Reserved.
  *
- * This software is proprietary and confidential. 
- * Unauthorized copying, distribution, or use of this file, 
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
  * via any medium, is strictly prohibited.
  */
 
@@ -84,23 +84,20 @@ pid_t find_pid(const char *name) {
 
   printf("[*] Found %d sober process(es)\n", count);
 
-  
   for (int i = 0; i < count; i++) {
     pid_t tracer = get_tracer_pid(candidates[i]);
     printf("[*] PID %d: TracerPid=%d\n", candidates[i], tracer);
 
     if (tracer == 0) {
-      
+
       printf("[*] Selected PID %d (not traced)\n", candidates[i]);
       return candidates[i];
     }
   }
 
-  
-  
   pid_t first_tracer = get_tracer_pid(candidates[0]);
   if (first_tracer > 0) {
-    
+
     char path[64];
     snprintf(path, sizeof(path), "/proc/%d/comm", first_tracer);
     if (access(path, F_OK) == 0) {
@@ -110,7 +107,6 @@ pid_t find_pid(const char *name) {
     }
   }
 
-  
   printf("[*] Fallback: selecting PID %d\n", candidates[0]);
   return candidates[0];
 }
@@ -215,11 +211,9 @@ int kill_tracer(pid_t target_pid) {
   printf("[!] Process is being traced by PID %d (anti-debug)\n", tracer);
   printf("[*] Killing tracer process...\n");
 
-  
   if (kill(tracer, SIGKILL) == 0) {
-    usleep(100000); 
+    usleep(100000);
 
-    
     pid_t new_tracer = get_tracer(target_pid);
     if (new_tracer == 0) {
       printf("[+] Tracer killed successfully\n");
@@ -300,14 +294,12 @@ unsigned long find_exec_region(pid_t pid) {
 int inject_ptrace(pid_t pid, const char *lib_path) {
   printf("[*] Using ptrace injection method on PID %d\n", pid);
 
-  
   pid_t tracer = get_tracer(pid);
   if (tracer > 0) {
     printf("[!] PID %d is being traced by %d\n", pid, tracer);
     printf("[*] Redirecting injection to tracer PID %d\n", tracer);
-    pid = tracer; 
+    pid = tracer;
 
-    
     pid_t tracer2 = get_tracer(pid);
     if (tracer2 > 0) {
       printf("[!] Tracer is also traced by %d - too deep\n", tracer2);
@@ -320,10 +312,9 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
 
   if (seccomp == 2) {
     printf("[!] Target has seccomp filters, trying alternative...\n");
-    return -1; 
+    return -1;
   }
 
-  
   int attached = 0;
   for (int i = 0; i < 5; i++) {
     if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == 0) {
@@ -351,7 +342,6 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
   }
   memcpy(&regs, &orig_regs, sizeof(regs));
 
-  
   unsigned long libc_base = get_remote_base(pid, "libc");
   unsigned long dlopen_offset =
       get_func_offset("libc.so.6", "__libc_dlopen_mode");
@@ -368,10 +358,9 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
   unsigned long target_dlopen = libc_base + dlopen_offset;
   printf("[*] Target dlopen: 0x%lx\n", target_dlopen);
 
-  
   size_t path_len = strlen(lib_path) + 1;
   regs.rsp -= 256;
-  regs.rsp &= ~0xF; 
+  regs.rsp &= ~0xF;
 
   for (size_t i = 0; i < path_len; i += sizeof(long)) {
     long word = 0;
@@ -381,12 +370,10 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
     ptrace(PTRACE_POKEDATA, pid, regs.rsp + i, word);
   }
 
-  
-  regs.rdi = regs.rsp;               
-  regs.rsi = RTLD_NOW | RTLD_GLOBAL; 
+  regs.rdi = regs.rsp;
+  regs.rsi = RTLD_NOW | RTLD_GLOBAL;
   regs.rip = target_dlopen;
 
-  
   regs.rsp -= 8;
   ptrace(PTRACE_POKEDATA, pid, regs.rsp, 0xDEADBEEF);
 
@@ -400,11 +387,9 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
     printf("[+] Process stopped (signal %d)\n", WSTOPSIG(status));
   }
 
-  
   ptrace(PTRACE_GETREGS, pid, NULL, &regs);
   printf("[*] dlopen returned: 0x%llx\n", regs.rax);
 
-  
   ptrace(PTRACE_SETREGS, pid, NULL, &orig_regs);
   ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
@@ -420,7 +405,6 @@ int inject_ptrace(pid_t pid, const char *lib_path) {
 int inject_gdb(pid_t pid, const char *lib_path) {
   printf("[*] Using gdb injection method on PID %d\n", pid);
 
-  
   pid_t tracer = get_tracer(pid);
   if (tracer > 0) {
     printf("[*] PID %d traced by %d, redirecting to tracer\n", pid, tracer);
@@ -460,7 +444,7 @@ int inject_gdb(pid_t pid, const char *lib_path) {
   }
 
   if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-    
+
     char maps_path[64];
     snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
     FILE *maps = fopen(maps_path, "r");
@@ -484,15 +468,12 @@ int inject_gdb(pid_t pid, const char *lib_path) {
 int inject_nsenter(pid_t pid, const char *lib_path) {
   printf("[*] Using nsenter injection (for Flatpak/containers)\n");
 
-  
   pid_t tracer = get_tracer(pid);
   if (tracer > 0) {
     printf("[*] Redirecting to tracer PID %d\n", tracer);
     pid = tracer;
   }
 
-  
-  
   char tmp_lib[256];
   snprintf(tmp_lib, sizeof(tmp_lib), "/tmp/sirracha_inject_%d.so", getpid());
 
@@ -505,7 +486,6 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
   }
   printf("[*] Library copied to %s\n", tmp_lib);
 
-  
   char cmd[4096];
   snprintf(cmd, sizeof(cmd),
            "nsenter -t %d -m -p -U --preserve-credentials "
@@ -521,7 +501,7 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
   printf("[*] Running: nsenter + gdb\n");
   FILE *fp = popen(cmd, "r");
   if (!fp) {
-    
+
     snprintf(cmd, sizeof(cmd),
              "gdb -batch -n "
              "-ex 'set pagination off' "
@@ -544,7 +524,6 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
   }
   pclose(fp);
 
-  
   char maps_path[64];
   snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
   FILE *maps = fopen(maps_path, "r");
@@ -561,7 +540,6 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
     fclose(maps);
   }
 
-  
   if (strstr(output, "= (void *)") && !strstr(output, "= (void *) 0x0")) {
     printf("[+] dlopen returned non-null - likely success\n");
     return 0;
@@ -603,18 +581,30 @@ int main(int argc, char **argv) {
     lib_path = "./sober_test_inject.so";
   }
 
-  
+  // Get absolute path or verify container path
   char abs_path[PATH_MAX];
   if (realpath(lib_path, abs_path) == NULL) {
-    fprintf(stderr, "[!] Library not found: %s\n", lib_path);
-    return EXIT_FAILURE;
+    // If realpath fails on host, check if it exists in target's root
+    // (Container/Flatpak support)
+    char container_path[PATH_MAX];
+    snprintf(container_path, sizeof(container_path), "/proc/%d/root%s", pid,
+             lib_path);
+
+    if (access(container_path, F_OK) == 0) {
+      // File exists in container! Use the provided path as-is.
+      strncpy(abs_path, lib_path, sizeof(abs_path));
+      printf("[*] Library found in container filesystem: %s\n", abs_path);
+    } else {
+      fprintf(stderr, "[!] Library not found on host or in container: %s\n",
+              lib_path);
+      return EXIT_FAILURE;
+    }
   }
 
   printf("[*] Target PID: %d\n", pid);
   printf("[*] Library: %s\n", abs_path);
   printf("\n");
 
-  
   char maps_path[64];
   snprintf(maps_path, sizeof(maps_path), "/proc/%d/maps", pid);
   FILE *maps = fopen(maps_path, "r");
@@ -630,21 +620,18 @@ int main(int argc, char **argv) {
     fclose(maps);
   }
 
-  
   if (inject_ptrace(pid, abs_path) == 0) {
     return EXIT_SUCCESS;
   }
 
   printf("\n[*] Trying gdb injection method...\n\n");
 
-  
   if (inject_gdb(pid, abs_path) == 0) {
     return EXIT_SUCCESS;
   }
 
   printf("\n[*] Trying nsenter injection (for Flatpak)...\n\n");
 
-  
   if (inject_nsenter(pid, abs_path) == 0) {
     return EXIT_SUCCESS;
   }
