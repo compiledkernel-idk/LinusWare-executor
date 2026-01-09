@@ -76,10 +76,12 @@ static void write_ready_signal(void) {
     fprintf(f, "sober_base=0x%lx\n", g_api.sober_base);
     fprintf(f, "lua_state=%p\n", (void *)g_api.L);
     fprintf(f, "functions=%d\n", g_api.functions_resolved);
-    chmod(IPC_READY_PATH, 0666);
+    fchmod(fileno(f), 0666);
     fclose(f);
+    log_debug("Ready signal written to %s\n", IPC_READY_PATH);
+  } else {
+    log_debug("Failed to write ready signal: %s\n", strerror(errno));
   }
-  log_debug("Ready signal written\n");
 }
 
 static void write_output(const char *fmt, ...) {
@@ -650,16 +652,34 @@ void *worker_thread_func(void *arg) {
       unlink(IPC_CMD_PATH);
     }
 
+    // Aggressive retry logic if state is missing
     if (!g_api.L && g_api.sober_base) {
       static int retry_count = 0;
-      if (++retry_count % 50 == 0) {
-        log_debug("Retrying Lua state search...\n");
-        g_api.L = find_lua_state(g_api.sober_base);
-        if (g_api.L) {
-          log_debug("Found Lua state on retry: %p\n", (void *)g_api.L);
-          resolve_functions(&g_api);
-          write_ready_signal();
+      if (++retry_count % 10 == 0) { // Retry every 1s
+        log_debug("Retrying Lua state search (attempt %d)...\n",
+                  retry_count / 10);
+
+        // Wrap find_lua_state in a safe call to prevent crashes
+        struct sigaction sa, old_segv;
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = crash_handler;
+        sigaction(SIGSEGV, &sa, &old_segv);
+
+        if (sigsetjmp(g_jmp, 1) == 0) {
+          g_in_call = 1;
+          g_api.L = find_lua_state(g_api.sober_base);
+          g_in_call = 0;
+
+          if (g_api.L) {
+            log_debug("Found Lua state on retry: %p\n", (void *)g_api.L);
+            resolve_functions(&g_api);
+            write_ready_signal(); // Trigger UI update!
+          }
+        } else {
+          g_in_call = 0;
+          log_debug("Crash caught during state search retry\n");
         }
+        sigaction(SIGSEGV, &old_segv, NULL);
       }
     }
 

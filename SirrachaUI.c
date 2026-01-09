@@ -99,6 +99,8 @@ static void set_status(const char *status) {
 }
 
 static void refresh_scripts(void) {
+  if (!script_store)
+    return;
   gtk_list_store_clear(script_store);
   DIR *d = opendir("scripts");
   if (!d) {
@@ -305,24 +307,23 @@ static void attach_thread(GTask *task, gpointer s, gpointer d,
   }
 
   if (pid > 0) {
-    char msg[64];
-    snprintf(msg, 64, "Target PID: %d", pid);
-    log_async(msg);
-
-    char cmd[128];
-    snprintf(cmd, 128, "./inject_sober.sh %d > /dev/shm/inject_log.txt 2>&1",
-             pid);
+    char *log_path =
+        g_strdup_printf("/dev/shm/sirracha_inject_%d.log", getpid());
+    char *cmd =
+        g_strdup_printf("./inject_sober.sh %d > %s 2>&1", pid, log_path);
     system("cp -f sober_test_inject.so /dev/shm/sirracha.so");
 
     log_async("Injecting...");
     int ret = system(cmd);
 
     char *log_content;
-    if (g_file_get_contents("/dev/shm/inject_log.txt", &log_content, NULL,
-                            NULL)) {
+    if (g_file_get_contents(log_path, &log_content, NULL, NULL)) {
       log_async(log_content);
       g_free(log_content);
     }
+    unlink(log_path);
+    g_free(log_path);
+    g_free(cmd);
 
     if (ret != 0) {
       log_async("Injector script failed.");

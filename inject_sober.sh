@@ -77,34 +77,50 @@ if grep -q "sirracha" "/proc/$PID/maps" 2>/dev/null; then
     exit 0
 fi
 
-# Try nsenter-based injection (fixes namespace mismatch in Flatpak)
-echo "Attempting namespace-aware injection..."
+# Try to copy the library into the target's private /tmp via /proc
+# This is the most reliable way to make a file visible inside a Flatpak/Bubblewrap sandbox
+TMP_NAME="sirracha_$(date +%s).so"
+TARGET_TMP="/tmp/$TMP_NAME"
+HOST_PATH_TO_TARGET_TMP="/proc/$PID/root/tmp/$TMP_NAME"
 
-# Copy lib to /tmp so it's accessible from different namespaces (Flatpak shares /tmp)
-TMP_LIB="/tmp/sirracha_$(date +%s).so"
-cp "$LIB_PATH" "$TMP_LIB"
-chmod 666 "$TMP_LIB"
+echo "Staging library for sandbox visibility..."
 
-# GDB Command with nsenter fallback
-GDB_CMD="gdb -q -batch -ex \"attach $PID\" -ex \"set confirm off\" -ex \"call (void*)dlopen(\\\"$TMP_LIB\\\", 2)\" -ex \"detach\" -ex \"quit\""
+if [ -d "/proc/$PID/root/tmp" ]; then
+    cp "$LIB_PATH" "$HOST_PATH_TO_TARGET_TMP" 2>/dev/null
+    chmod 666 "$HOST_PATH_TO_TARGET_TMP" 2>/dev/null
+    USED_PATH="$TARGET_TMP"
+    echo "Staged via /proc/$PID/root/tmp"
+else
+    # Fallback for non-sandboxed or restricted /proc
+    cp "$LIB_PATH" "/tmp/$TMP_NAME"
+    chmod 666 "/tmp/$TMP_NAME"
+    USED_PATH="/tmp/$TMP_NAME"
+    echo "Staged via host /tmp"
+fi
 
-# First try with nsenter
+# GDB Command
+GDB_CMD="gdb -q -batch -ex \"attach $PID\" -ex \"set confirm off\" -ex \"call (void*)dlopen(\\\"$USED_PATH\\\", 2)\" -ex \"detach\" -ex \"quit\""
+
+# First try with nsenter (enters the sandbox namespaces)
 GDB_OUTPUT=$(nsenter -t "$PID" -m -p -U --preserve-credentials bash -c "$GDB_CMD" 2>&1)
 
-# If nsenter fails or gdb failed inside, try direct gdb as fallback
-if [[ $? -ne 0 ]] || echo "$GDB_OUTPUT" | grep -qi "error"; then
-    echo "nsenter injection issue, trying direct gdb fallback..."
+# If nsenter fails or gdb failed inside, try direct gdb from host
+if [[ $? -ne 0 ]] || echo "$GDB_OUTPUT" | grep -qiE "(error|failed)"; then
+    echo "nsenter failed, trying direct gdb from host..."
     GDB_OUTPUT=$(gdb -q -batch \
         -ex "set sysroot /proc/$PID/root" \
         -ex "attach $PID" \
         -ex "set confirm off" \
-        -ex "call (void*)dlopen(\"$TMP_LIB\", 2)" \
+        -ex "call (void*)dlopen(\"$USED_PATH\", 2)" \
         -ex "detach" \
         -ex "quit" 2>&1)
 fi
 
 GDB_EXIT=$?
-rm -f "$TMP_LIB"
+
+# Cleanup (best effort)
+rm -f "$HOST_PATH_TO_TARGET_TMP" 2>/dev/null
+rm -f "/tmp/$TMP_NAME" 2>/dev/null
 
 echo "$GDB_OUTPUT" >> /dev/shm/sirracha_gdb.log 2>/dev/null
 
@@ -115,7 +131,8 @@ fi
 
 if echo "$GDB_OUTPUT" | grep -qE '\$[0-9]+ = \(void \*\) 0x0'; then
     echo "ERROR: dlopen returned NULL - library failed to load"
-    echo "Check: $LIB_PATH exists and is accessible from sandbox"
+    echo "Attempted path: $USED_PATH"
+    echo "Check if the process has permission to load libraries from that location."
     exit 1
 fi
 
