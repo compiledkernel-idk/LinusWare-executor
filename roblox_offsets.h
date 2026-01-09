@@ -1,4 +1,15 @@
 
+/*
+ * Filename: roblox_offsets.h
+ *
+ * Copyright (c) 2026 compiledkernel-idk
+ * All Rights Reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
+ * via any medium, is strictly prohibited.
+ */
+
 #ifndef ROBLOX_OFFSETS_H
 #define ROBLOX_OFFSETS_H
 

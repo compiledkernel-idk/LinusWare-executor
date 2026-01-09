@@ -1,4 +1,15 @@
 
+/*
+ * Filename: pattern_scanner.c
+ *
+ * Copyright (c) 2026 compiledkernel-idk
+ * All Rights Reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
+ * via any medium, is strictly prohibited.
+ */
+
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <setjmp.h>
@@ -65,7 +76,6 @@ uintptr_t scan_for_pattern(uintptr_t start, size_t size, const uint8_t *pattern,
     return 0;
   }
 
-  
   struct sigaction sa, old_segv, old_bus;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = scan_signal_handler;
@@ -96,48 +106,30 @@ uintptr_t scan_for_pattern(uintptr_t start, size_t size, const uint8_t *pattern,
 }
 
 static const uint8_t PATTERN_GETTOP[] = {
-    0x48, 0x8B, 0x47, 0x10, 
-    0x48, 0x2B, 0x47, 0x08, 
+    0x48, 0x8B, 0x47, 0x10, 0x48, 0x2B, 0x47, 0x08,
 };
 static const char MASK_GETTOP[] = "xxxx?xxx";
 
 static const uint8_t PATTERN_SETTOP[] = {
-    0x55,                   
-    0x48, 0x89, 0xE5,       
-    0x48, 0x8B, 0x47, 0x08, 
+    0x55, 0x48, 0x89, 0xE5, 0x48, 0x8B, 0x47, 0x08,
 };
 static const char MASK_SETTOP[] = "xxxxxxxx";
 
 static const uint8_t PATTERN_PUSHSTRING[] = {
-    0x55,             
-    0x48, 0x89, 0xE5, 
-    0x41, 0x56,       
-    0x53,             
-    0x48, 0x89, 0xFB, 
-    0x49, 0x89, 0xF6, 
+    0x55, 0x48, 0x89, 0xE5, 0x41, 0x56, 0x53,
+    0x48, 0x89, 0xFB, 0x49, 0x89, 0xF6,
 };
 static const char MASK_PUSHSTRING[] = "xxxxxxxxxxxxxx";
 
 static const uint8_t PATTERN_PCALL[] = {
-    0x55,             
-    0x48, 0x89, 0xE5, 
-    0x41, 0x57,       
-    0x41, 0x56,       
-    0x41, 0x55,       
-    0x41, 0x54,       
-    0x53,             
+    0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41,
+    0x56, 0x41, 0x55, 0x41, 0x54, 0x53,
 };
 static const char MASK_PCALL[] = "xxxxxxxxxxxxxxx";
 
 static const uint8_t PATTERN_LOADBUFFER[] = {
-    0x55,             
-    0x48, 0x89, 0xE5, 
-    0x41, 0x57,       
-    0x41, 0x56,       
-    0x41, 0x55,       
-    0x41, 0x54,       
-    0x53,             
-    0x48, 0x83, 0xEC, 
+    0x55, 0x48, 0x89, 0xE5, 0x41, 0x57, 0x41, 0x56,
+    0x41, 0x55, 0x41, 0x54, 0x53, 0x48, 0x83, 0xEC,
 };
 static const char MASK_LOADBUFFER[] = "xxxxxxxxxxxxxxxxxx";
 
@@ -146,7 +138,7 @@ typedef struct {
   const uint8_t *pattern;
   const char *mask;
   size_t length;
-  size_t api_offset; 
+  size_t api_offset;
 } pattern_entry_t;
 
 #define OFFSETOF(type, member) ((size_t)&((type *)0)->member)
@@ -183,7 +175,7 @@ static int find_code_regions(code_region_t *regions, int max_regions) {
     char perms[5];
 
     if (sscanf(line, "%lx-%lx %4s", &start, &end, perms) >= 3) {
-      
+
       if (perms[2] == 'x' && strstr(line, "/sober")) {
         regions[count].start = start;
         regions[count].end = end;
@@ -225,24 +217,22 @@ int scan_and_resolve_functions(luau_api_t *api) {
 
   int resolved = 0;
 
-  
   for (int p = 0; PATTERNS[p].name != NULL; p++) {
     const pattern_entry_t *pe = &PATTERNS[p];
 
-    
     for (int r = 0; r < region_count; r++) {
       uintptr_t addr = scan_for_pattern(regions[r].start, regions[r].size,
                                         pe->pattern, pe->mask, pe->length);
 
       if (addr) {
-        
+
         void **target = (void **)((uint8_t *)api + pe->api_offset);
         *target = (void *)addr;
 
         log_debug("Found %s at 0x%lx (offset 0x%lx)\n", pe->name, addr,
                   addr - api->sober_base);
         resolved++;
-        break; 
+        break;
       }
     }
   }
@@ -264,9 +254,8 @@ static const struct {
                      {0x050000, 0x080000, "String/table ops"},
                      {0, 0, NULL}};
 
-static const uint8_t PROLOGUE_PUSH_RBP[] = {0x55}; 
-static const uint8_t PROLOGUE_FULL[] = {0x55, 0x48, 0x89,
-                                        0xE5}; 
+static const uint8_t PROLOGUE_PUSH_RBP[] = {0x55};
+static const uint8_t PROLOGUE_FULL[] = {0x55, 0x48, 0x89, 0xE5};
 
 int is_valid_function_prologue(uintptr_t addr) {
   struct sigaction sa, old_segv;
@@ -280,23 +269,22 @@ int is_valid_function_prologue(uintptr_t addr) {
   if (sigsetjmp(g_scan_jmp, 1) == 0) {
     const uint8_t *bytes = (const uint8_t *)addr;
 
-    
-    if (bytes[0] == 0x55) { 
+    if (bytes[0] == 0x55) {
       valid = 1;
-      
+
       if (bytes[1] == 0x48 && bytes[2] == 0x89 && bytes[3] == 0xE5) {
-        valid = 2; 
+        valid = 2;
       }
     }
-    
+
     else if (bytes[0] == 0x41 && (bytes[1] >= 0x54 && bytes[1] <= 0x57)) {
       valid = 1;
     }
-    
+
     else if (bytes[0] == 0x48 && bytes[1] == 0x83 && bytes[2] == 0xEC) {
       valid = 1;
     }
-    
+
     else if (bytes[0] == 0xF3 && bytes[1] == 0x0F && bytes[2] == 0x1E &&
              bytes[3] == 0xFA) {
       valid = 1;
@@ -335,13 +323,12 @@ int scan_range_for_functions(uintptr_t base, uintptr_t start_offset,
             start_offset, end_offset);
 
   if (sigsetjmp(g_scan_jmp, 1) == 0) {
-    
+
     for (uintptr_t off = start_offset; off < end_offset && count < max_results;
          off += 16) {
       uintptr_t addr = base + off;
       const uint8_t *bytes = (const uint8_t *)addr;
 
-      
       if (bytes[0] == 0x55 && bytes[1] == 0x48 && bytes[2] == 0x89 &&
           bytes[3] == 0xE5) {
         results[count].addr = addr;
@@ -370,7 +357,6 @@ int safe_function_discovery(luau_api_t *api) {
   static found_func_t functions[MAX_FOUND_FUNCS];
   int total_found = 0;
 
-  
   for (int r = 0;
        OFFSET_RANGES[r].desc != NULL && total_found < MAX_FOUND_FUNCS; r++) {
     log_debug("Scanning %s (0x%lx - 0x%lx)...\n", OFFSET_RANGES[r].desc,
@@ -383,17 +369,15 @@ int safe_function_discovery(luau_api_t *api) {
     total_found += found;
   }
 
-  
   log_debug("\n=== PROMISING CANDIDATES ===\n");
   int promising = 0;
 
   for (int i = 0; i < total_found; i++) {
     uintptr_t off = functions[i].offset;
 
-    
-    if ((off >= 0x180000 && off <= 0x190000) || 
-        (off >= 0x120000 && off <= 0x130000) || 
-        (off >= 0x100000 && off <= 0x115000)) { 
+    if ((off >= 0x180000 && off <= 0x190000) ||
+        (off >= 0x120000 && off <= 0x130000) ||
+        (off >= 0x100000 && off <= 0x115000)) {
 
       log_debug("CANDIDATE: offset=0x%lx addr=0x%lx confidence=%d\n", off,
                 functions[i].addr, functions[i].confidence);
@@ -401,9 +385,6 @@ int safe_function_discovery(luau_api_t *api) {
     }
   }
 
-  
-  
-  
   log_debug("\n=== LOOKING FOR FUNCTION CLUSTERS ===\n");
 
   for (int i = 0; i < total_found - 2; i++) {
@@ -411,13 +392,9 @@ int safe_function_discovery(luau_api_t *api) {
     uintptr_t off2 = functions[i + 1].offset;
     uintptr_t off3 = functions[i + 2].offset;
 
-    
     if ((off2 - off1 >= 16 && off2 - off1 <= 64) &&
         (off3 - off2 >= 16 && off3 - off2 <= 64)) {
       log_debug("CLUSTER at offsets: 0x%lx, 0x%lx, 0x%lx\n", off1, off2, off3);
-
-      
-      
     }
   }
 
@@ -429,33 +406,32 @@ int safe_function_discovery(luau_api_t *api) {
 int probe_candidate_offsets(luau_api_t *api,
                             int (*test_func)(void *, lua_State *,
                                              const char *)) {
-  (void)test_func; 
+  (void)test_func;
   return safe_function_discovery(api);
 }
 
-static const char *LUA_STRINGS[] = {
-    "attempt to call a",  
-    "attempt to index a", 
-    "stack overflow",     
-    "C stack overflow",   
-    "cannot resume",      
-    "string.format",      
-    "loadstring",         
-    "@",                  
-    "function",           
-    "nil",                
-    "table",              
-    "getmetatable",       
-    "setmetatable",       
-    "print",              
-    "error",              
-    "pcall",              
-    "xpcall",             
-    "tostring",           
-    "tonumber",           
-    "lua_State",          
-    "LUAU_",              
-    NULL};
+static const char *LUA_STRINGS[] = {"attempt to call a",
+                                    "attempt to index a",
+                                    "stack overflow",
+                                    "C stack overflow",
+                                    "cannot resume",
+                                    "string.format",
+                                    "loadstring",
+                                    "@",
+                                    "function",
+                                    "nil",
+                                    "table",
+                                    "getmetatable",
+                                    "setmetatable",
+                                    "print",
+                                    "error",
+                                    "pcall",
+                                    "xpcall",
+                                    "tostring",
+                                    "tonumber",
+                                    "lua_State",
+                                    "LUAU_",
+                                    NULL};
 
 int scan_for_lua_strings(uintptr_t base, size_t size) {
   if (!base || !size)
@@ -481,7 +457,7 @@ int scan_for_lua_strings(uintptr_t base, size_t size) {
         if (memcmp(data + i, target, str_len) == 0) {
           log_debug("Found '%s' at offset 0x%lx\n", target, (uintptr_t)i);
           found++;
-          break; 
+          break;
         }
       }
     }
@@ -502,7 +478,6 @@ uintptr_t find_function_by_string_ref(uintptr_t base, size_t size,
 
   size_t str_len = strlen(target_string);
 
-  
   struct sigaction sa, old_segv;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = scan_signal_handler;
@@ -528,8 +503,8 @@ uintptr_t find_function_by_string_ref(uintptr_t base, size_t size,
 }
 
 typedef struct {
-  uintptr_t lea_addr;   
-  uintptr_t func_start; 
+  uintptr_t lea_addr;
+  uintptr_t func_start;
 } xref_result_t;
 
 #define MAX_XREFS 32
@@ -551,37 +526,31 @@ int find_xrefs_to_address(uintptr_t code_start, size_t code_size,
   if (sigsetjmp(g_scan_jmp, 1) == 0) {
     const uint8_t *code = (const uint8_t *)code_start;
 
-    
     for (size_t i = 0; i < code_size - 7 && count < max_results; i++) {
-      
-      
+
       if (code[i] == 0x48 && code[i + 1] == 0x8D) {
         uint8_t modrm = code[i + 2];
 
-        
         if ((modrm & 0xC7) == 0x05) {
-          
+
           int32_t disp = *(int32_t *)&code[i + 3];
 
-          
           uintptr_t lea_addr = code_start + i;
           uintptr_t ref_target = lea_addr + 7 + disp;
 
-          
           if (ref_target == target_addr) {
             results[count].lea_addr = lea_addr;
 
-            
             uintptr_t func_start = 0;
             for (int j = 0; j < 512 && i >= (size_t)j; j++) {
-              
+
               if (code[i - j] == 0x55 && i - j + 3 < code_size &&
                   code[i - j + 1] == 0x48 && code[i - j + 2] == 0x89 &&
                   code[i - j + 3] == 0xE5) {
                 func_start = code_start + i - j;
                 break;
               }
-              
+
               if (code[i - j] == 0x55 && j > 4) {
                 func_start = code_start + i - j;
                 break;
@@ -619,7 +588,7 @@ int scan_all_strings(luau_api_t *api) {
     char perms[5];
 
     if (sscanf(line, "%lx-%lx %4s", &start, &end, perms) >= 3) {
-      
+
       if (perms[0] == 'r' && strstr(line, "/sober")) {
         total_strings += scan_for_lua_strings(start, end - start);
       }
@@ -636,7 +605,6 @@ int aggressive_function_discovery(luau_api_t *api) {
 
   log_debug("=== AGGRESSIVE FUNCTION DISCOVERY ===\n");
 
-  
   code_region_t regions[16];
   int region_count = find_code_regions(regions, 16);
   if (region_count == 0) {
@@ -647,7 +615,6 @@ int aggressive_function_discovery(luau_api_t *api) {
   uintptr_t code_start = regions[0].start;
   size_t code_size = regions[0].size;
 
-  
   struct {
     const char *str;
     const char *likely_func;
@@ -661,7 +628,6 @@ int aggressive_function_discovery(luau_api_t *api) {
   int functions_found = 0;
   xref_result_t xrefs[MAX_XREFS];
 
-  
   FILE *maps = fopen("/proc/self/maps", "r");
   if (!maps)
     return 0;
@@ -680,7 +646,7 @@ int aggressive_function_discovery(luau_api_t *api) {
 
       size_t size = end - start;
       if (size > 100 * 1024 * 1024)
-        continue; 
+        continue;
 
       for (int m = 0; markers[m].str != NULL; m++) {
         uintptr_t str_addr =
@@ -690,7 +656,6 @@ int aggressive_function_discovery(luau_api_t *api) {
           log_debug("Found marker '%s' for %s\n", markers[m].str,
                     markers[m].likely_func);
 
-          
           int xref_count = find_xrefs_to_address(code_start, code_size,
                                                  str_addr, xrefs, MAX_XREFS);
 

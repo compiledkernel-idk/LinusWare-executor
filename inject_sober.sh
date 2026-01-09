@@ -1,5 +1,13 @@
 #!/bin/bash
+# Filename: inject_sober.sh
 #
+# Copyright (c) 2026 compiledkernel-idk
+# All Rights Reserved.
+#
+# This software is proprietary and confidential. 
+# Unauthorized copying, distribution, or use of this file, 
+# via any medium, is strictly prohibited.
+
 
 PID=$1
 LIB_PATH="/dev/shm/sirracha.so"

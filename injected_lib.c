@@ -1,4 +1,15 @@
 
+/*
+ * Filename: injected_lib.c
+ *
+ * Copyright (c) 2026 compiledkernel-idk
+ * All Rights Reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
+ * via any medium, is strictly prohibited.
+ */
+
 #define _GNU_SOURCE
 #include "roblox_offsets.h"
 #include <dirent.h>

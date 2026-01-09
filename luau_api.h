@@ -1,4 +1,15 @@
 
+/*
+ * Filename: luau_api.h
+ *
+ * Copyright (c) 2026 compiledkernel-idk
+ * All Rights Reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
+ * via any medium, is strictly prohibited.
+ */
+
 #ifndef LUAU_API_H
 #define LUAU_API_H
 
@@ -86,15 +97,13 @@ typedef int (*luaL_ref_t)(lua_State *L, int t);
 typedef void (*luaL_unref_t)(lua_State *L, int t, int ref);
 
 typedef struct luau_api {
-  
+
   uintptr_t sober_base;
   lua_State *L;
 
-  
   int initialized;
   int functions_resolved;
 
-  
   lua_gettop_t gettop;
   lua_settop_t settop;
   lua_pushvalue_t pushvalue;
@@ -103,7 +112,6 @@ typedef struct luau_api {
   lua_replace_t replace;
   lua_checkstack_t checkstack;
 
-  
   lua_pushnil_t pushnil;
   lua_pushnumber_t pushnumber;
   lua_pushinteger_t pushinteger;
@@ -113,7 +121,6 @@ typedef struct luau_api {
   lua_pushcclosure_t pushcclosure;
   lua_pushlightuserdata_t pushlightuserdata;
 
-  
   lua_tonumber_t tonumber;
   lua_tointeger_t tointeger;
   lua_toboolean_t toboolean;
@@ -123,7 +130,6 @@ typedef struct luau_api {
   lua_tothread_t tothread;
   lua_topointer_t topointer;
 
-  
   lua_type_t type;
   lua_typename_t lua_typename;
   lua_isnumber_t isnumber;
@@ -131,7 +137,6 @@ typedef struct luau_api {
   lua_iscfunction_t iscfunction;
   lua_isuserdata_t isuserdata;
 
-  
   lua_gettable_t gettable;
   lua_getfield_t getfield;
   lua_rawget_t rawget;
@@ -146,19 +151,15 @@ typedef struct luau_api {
   lua_rawseti_t rawseti;
   lua_setmetatable_t setmetatable;
 
-  
   lua_getglobal_t getglobal;
   lua_setglobal_t setglobal;
 
-  
   lua_call_t call;
   lua_pcall_t pcall;
 
-  
   luaL_loadbuffer_t loadbuffer;
   luaL_loadstring_t loadstring;
 
-  
   luaL_ref_t ref;
   luaL_unref_t unref;
 
@@ -169,13 +170,13 @@ typedef struct {
   const uint8_t *pattern;
   const char *mask;
   size_t length;
-  int offset_from_match; 
+  int offset_from_match;
 } func_pattern_t;
 
 typedef struct {
   const char *name;
   uintptr_t address;
-  int confidence; 
+  int confidence;
 } scan_result_t;
 
 int luau_api_init(luau_api_t *api);

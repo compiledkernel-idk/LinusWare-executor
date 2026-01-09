@@ -1,3 +1,14 @@
+/*
+ * Filename: SirrachaUI.c
+ *
+ * Copyright (c) 2026 compiledkernel-idk
+ * All Rights Reserved.
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or use of this file,
+ * via any medium, is strictly prohibited.
+ */
+
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <gtk/gtk.h>
@@ -363,7 +374,6 @@ static void activate(GtkApplication *app, gpointer d) {
   gtk_window_set_default_size(GTK_WINDOW(window), 1000, 700);
   gtk_window_set_icon_name(GTK_WINDOW(window), "application-x-executable");
 
-
   GtkWidget *header = gtk_header_bar_new();
   gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(header), TRUE);
   gtk_window_set_titlebar(GTK_WINDOW(window), header);
@@ -515,8 +525,7 @@ static void activate(GtkApplication *app, gpointer d) {
 
   GtkWidget *about_author = gtk_label_new(NULL);
   gtk_label_set_markup(GTK_LABEL(about_author),
-                       "<span size='small'>© 2026 compiledkernel-idk / "
-                       "theterminatorgm</span>");
+                       "<span size='small'>© 2026 compiledkernel-idk</span>");
   gtk_box_append(GTK_BOX(about_box), about_author);
 
   gtk_notebook_append_page(GTK_NOTEBOOK(notebook), about_box,

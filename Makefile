@@ -1,3 +1,12 @@
+# Filename: Makefile
+#
+# Copyright (c) 2026 compiledkernel-idk
+# All Rights Reserved.
+#
+# This software is proprietary and confidential. 
+# Unauthorized copying, distribution, or use of this file, 
+# via any medium, is strictly prohibited.
+
 # Sirracha Executor Makefile
 
 CC = gcc
