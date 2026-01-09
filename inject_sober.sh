@@ -98,6 +98,25 @@ else
     echo "Staged via host /tmp"
 fi
 
+# TRY BINARY INJECTOR FIRST (Robust Ptrace Method)
+if [ -f "./injector" ]; then
+    echo "Using optimized binary injector..."
+    chmod +x ./injector
+    ./injector "$PID" "$USED_PATH"
+    RET=$?
+    
+    if [ $RET -eq 0 ]; then
+        echo "Binary injection successful"
+        
+        # Cleanup
+        rm -f "$HOST_PATH_TO_TARGET_TMP" 2>/dev/null
+        rm -f "/tmp/$TMP_NAME" 2>/dev/null
+        exit 0
+    else
+        echo "Binary injector failed (code $RET), falling back to GDB..."
+    fi
+fi
+
 # GDB Command
 GDB_CMD="gdb -q -batch -ex \"attach $PID\" -ex \"set confirm off\" -ex \"call (void*)dlopen(\\\"$USED_PATH\\\", 2)\" -ex \"detach\" -ex \"quit\""
 

@@ -18,7 +18,7 @@ DL = -ldl
 
 .PHONY: all clean install run
 
-all: sirracha sirracha_exec.so sober_test_inject.so
+all: sirracha sirracha_exec.so sober_test_inject.so injector
 	@cp -f sirracha_exec.so /dev/shm/sirracha.so
 	@chmod 777 /dev/shm/sirracha.so
 	@strip --strip-all sirracha 2>/dev/null || true
@@ -40,6 +40,10 @@ sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c luau_api.h rob
 
 sober_test_inject.so: sirracha_exec.so
 	@cp sirracha_exec.so sober_test_inject.so
+
+injector: Injector.c
+	@echo "Building optimized injector..."
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ Injector.c $(DL)
 
 install: all
 	@echo "Installed to /dev/shm/sirracha.so"
