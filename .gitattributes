@@ -1,0 +1,27 @@
+# Sirracha Executor - Language Detection
+# Fix GitHub language stats
+
+# C code
+*.c linguist-language=C
+*.h linguist-language=C
+
+# C++ code  
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+
+# Assembly
+*.s linguist-language=Assembly
+*.asm linguist-language=Assembly
+
+# Python
+*.py linguist-language=Python
+
+# Shell scripts - don't count as main language
+*.sh linguist-detectable=false
+
+# Build files - don't count as main language
+Makefile linguist-detectable=false
+CMakeLists.txt linguist-detectable=false
+
+# Documentation
+*.md linguist-documentation=true
