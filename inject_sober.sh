@@ -135,6 +135,6 @@ if grep -q "sirracha" "/proc/$TARGET/maps" 2>/dev/null; then
     exit 0
 fi
 
-echo "[ERROR] All methods failed. Debug log:"
-cat "$LOGfile"
+echo "[ERROR] All methods failed." | tee -a "$LOGfile"
+tail -n 5 "$LOGfile"
 exit 1
