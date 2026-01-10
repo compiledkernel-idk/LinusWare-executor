@@ -22,3 +22,8 @@ sirracha
 # Debug files
 *.dSYM/
 core
+
+# Node dependencies
+node_modules/
+dist/
+.env

@@ -9,52 +9,51 @@
 
 # Sirracha Executor Makefile
 
+# Sirracha Executor Makefile (Electron UI)
+
 CC = gcc
-CFLAGS = -Wall -Wextra -O3 -ffunction-sections -fdata-sections -fno-asynchronous-unwind-tables -s
+CFLAGS = -Wall -O3 -fPIC -ffunction-sections -fdata-sections -s
 LDFLAGS = -Wl,--gc-sections,--strip-all,-z,now,-z,relro
-GTK_FLAGS = $(shell pkg-config --cflags --libs gtk4 gtksourceview-5)
 PTHREAD = -lpthread
 DL = -ldl
+UI_DIR = sirracha-ui
 
-.PHONY: all clean install run
+.PHONY: all clean install run ui-dep
 
-all: sirracha sirracha_exec.so sober_test_inject.so injector
+all: sirracha_exec.so injector ui-dep
 	@cp -f sirracha_exec.so /dev/shm/sirracha.so
 	@chmod 777 /dev/shm/sirracha.so
-	@strip --strip-all sirracha 2>/dev/null || true
 	@strip --strip-all sirracha_exec.so 2>/dev/null || true
-	@echo "Encrypting binaries..."
-	@upx --best --ultra-brute sirracha >/dev/null 2>&1 || upx -9 sirracha >/dev/null 2>&1 || true
+	@echo "Encrypting binary..."
 	@upx --best --ultra-brute sirracha_exec.so >/dev/null 2>&1 || upx -9 sirracha_exec.so >/dev/null 2>&1 || true
 	@echo ""
-	@echo "Build complete (Encrypted & Stripped). Run: ./sirracha"
+	@echo "Build complete. Run: make run"
 	@echo ""
 
-sirracha: SirrachaUI.c sirracha_logo.png
-	@echo "Building..."
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ SirrachaUI.c $(GTK_FLAGS) $(PTHREAD)
-
+# The main injection library (BACKEND)
 sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c luau_api.h roblox_offsets.h
-	$(CC) $(CFLAGS) -shared -fPIC -o $@ injected_lib.c pattern_scanner.c roblox_state.c $(DL) $(PTHREAD)
+	$(CC) $(CFLAGS) -shared -o $@ injected_lib.c pattern_scanner.c roblox_state.c $(DL) $(PTHREAD)
 	@strip --strip-unneeded $@ 2>/dev/null || true
 
-sober_test_inject.so: sirracha_exec.so
-	@cp sirracha_exec.so sober_test_inject.so
-
+# The CLI/helper injector (OPTIONAL usage)
 injector: Injector.c
-	@echo "Building optimized injector..."
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ Injector.c $(DL)
 
-install: all
-	@echo "Installed to /dev/shm/sirracha.so"
+# Install UI dependencies
+ui-dep:
+	@if [ ! -d "$(UI_DIR)/node_modules" ]; then \
+		echo "Installing UI dependencies..."; \
+		cd $(UI_DIR) && npm install; \
+	fi
 
 run: all
-	./sirracha
+	@echo "Launching Sirracha UI..."
+	@./$(UI_DIR)/run.sh
 
 clean:
-	rm -f sirracha sirracha_exec.so sober_test_inject.so
+	rm -f sirracha_exec.so injector sober_test_inject.so
 	rm -f /dev/shm/sirracha*.so
 	@echo "Clean"
 
 logs:
-	@cat /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log"
+	@tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"

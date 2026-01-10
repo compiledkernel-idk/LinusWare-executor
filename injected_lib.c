@@ -422,21 +422,20 @@ int resolve_functions(luau_api_t *api) {
     resolved++;
   }
 
-  // If we have libloader, use its offsets
-  if (api->sober_base) {
-    // Use offsets from KNOWN_OFFSETS array - these are sober offsets
-    api->loadbuffer = (luaL_loadbuffer_t)(api->sober_base + 0x1846a0);
-    api->pcall = (lua_pcall_t)(api->sober_base + 0x1846c0);
-    api->getglobal = (lua_getglobal_t)(api->sober_base + 0x1846e0);
-    api->gettop = (lua_gettop_t)(api->sober_base + 0x184920);
-    api->settop = (lua_settop_t)(api->sober_base + 0x184940);
-    api->pushstring = (lua_pushstring_t)(api->sober_base + 0x1849b0);
-    api->tolstring = (lua_tolstring_t)(api->sober_base + 0x180dd0);
-
-    log_debug("loadbuffer at: %p\\n", (void *)api->loadbuffer);
-    log_debug("pcall at: %p\\n", (void *)api->pcall);
-    resolved = 7;
-  }
+  /*
+   * OLD KNOWN OFFSETS (For Reference / Older Sober Versions)
+   * relative to libloader.so base
+   *
+   * #define OFF_LOADBUFFER 0x1846a0
+   * #define OFF_PCALL      0x1846c0
+   * #define OFF_GETGLOBAL  0x184290
+   * #define OFF_SETTOP     0x184d50
+   * #define OFF_PUSHSTRING 0x184b20
+   * #define OFF_TOLSTRING  0x184e90
+   * #define OFF_GETTOP     0x184350
+   */
+  log_debug("Offsets need updating. Check source comments.\\n");
+  resolved = 0;
 
   log_debug("Resolved %d functions\\n", resolved);
   api->functions_resolved = resolved;
