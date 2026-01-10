@@ -7,8 +7,6 @@
 # Unauthorized copying, distribution, or use of this file,
 # via any medium, is strictly prohibited.
 
-# Sirracha Executor Makefile
-
 # Sirracha Executor Makefile (Qt UI)
 
 CC = gcc
@@ -18,7 +16,7 @@ LDFLAGS = -Wl,--gc-sections,--strip-all,-z,now,-z,relro
 PTHREAD = -lpthread
 DL = -ldl
 
-.PHONY: all clean install run qt-ui
+.PHONY: all clean run qt-ui logs
 
 all: sirracha_exec.so injector qt-ui
 	@cp -f sirracha_exec.so /dev/shm/sirracha.so
@@ -35,7 +33,7 @@ sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c simd_utils.s h
 	$(CC) $(CFLAGS) -shared -o $@ injected_lib.c pattern_scanner.c roblox_state.c simd_utils.s heavy_math.s $(DL) $(PTHREAD)
 	@strip --strip-unneeded $@ 2>/dev/null || true
 
-# The CLI/helper injector (OPTIONAL usage)
+# The CLI/helper injector
 injector: Injector.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ Injector.c $(DL)
 
@@ -45,22 +43,19 @@ qt-ui: sirracha-qt
 sirracha-qt: SirrachaQt.cpp
 	@echo "Building Qt UI..."
 	@mkdir -p build
-	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && make -j$(nproc) 2>&1 | tail -5
+	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && make -j$$(nproc) 2>&1 | tail -5
 	@cp build/sirracha-qt . 2>/dev/null || echo "Qt build failed - install Qt5/Qt6 dev packages"
 
 run: all
-	@echo "Launching Sirracha Qt UI..."
-	@./sirracha-qt 2>/dev/null || ./sirracha-ui/run.sh
-
-# Legacy Electron UI
-run-electron:
-	@./sirracha-ui/run.sh
+	@echo "Launching Sirracha..."
+	@./sirracha-qt
 
 clean:
-	rm -f sirracha_exec.so injector sober_test_inject.so sirracha-qt
+	rm -f sirracha_exec.so injector sirracha-qt
 	rm -rf build
 	rm -f /dev/shm/sirracha*.so
 	@echo "Clean"
 
 logs:
 	@tail -f /tmp/sirracha_debug.log 2>/dev/null || tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"
+
