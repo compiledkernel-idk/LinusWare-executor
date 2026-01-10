@@ -18,7 +18,7 @@ endif()
 
 # Source files
 set(SOURCES
-    SirrachaQt.cpp
+    src/ui/SirrachaQt.cpp
 )
 
 # Create executable

@@ -2,10 +2,6 @@
 #
 # Copyright (c) 2026 compiledkernel-idk
 # All Rights Reserved.
-#
-# This software is proprietary and confidential.
-# Unauthorized copying, distribution, or use of this file,
-# via any medium, is strictly prohibited.
 
 # Sirracha Executor Makefile (Qt UI)
 
@@ -15,6 +11,11 @@ CFLAGS = -Wall -O3 -fPIC -ffunction-sections -fdata-sections -s
 LDFLAGS = -Wl,--gc-sections,--strip-all,-z,now,-z,relro
 PTHREAD = -lpthread
 DL = -ldl
+
+# Source directories
+SRC_CORE = src/core
+SRC_ASM = src/asm
+SRC_UI = src/ui
 
 .PHONY: all clean run qt-ui logs
 
@@ -29,18 +30,24 @@ all: sirracha_exec.so injector qt-ui
 	@echo ""
 
 # The main injection library (BACKEND)
-sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c simd_utils.s heavy_math.s luau_api.h roblox_offsets.h
-	$(CC) $(CFLAGS) -shared -o $@ injected_lib.c pattern_scanner.c roblox_state.c simd_utils.s heavy_math.s $(DL) $(PTHREAD)
+sirracha_exec.so: $(SRC_CORE)/injected_lib.c $(SRC_CORE)/pattern_scanner.c $(SRC_CORE)/roblox_state.c $(SRC_ASM)/simd_utils.s $(SRC_ASM)/heavy_math.s
+	$(CC) $(CFLAGS) -I$(SRC_CORE) -shared -o $@ \
+		$(SRC_CORE)/injected_lib.c \
+		$(SRC_CORE)/pattern_scanner.c \
+		$(SRC_CORE)/roblox_state.c \
+		$(SRC_ASM)/simd_utils.s \
+		$(SRC_ASM)/heavy_math.s \
+		$(DL) $(PTHREAD)
 	@strip --strip-unneeded $@ 2>/dev/null || true
 
 # The CLI/helper injector
-injector: Injector.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ Injector.c $(DL)
+injector: src/Injector.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ src/Injector.c $(DL)
 
 # Qt UI build
 qt-ui: sirracha-qt
 
-sirracha-qt: SirrachaQt.cpp
+sirracha-qt: $(SRC_UI)/SirrachaQt.cpp
 	@echo "Building Qt UI..."
 	@mkdir -p build
 	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && make -j$$(nproc) 2>&1 | tail -5
@@ -59,3 +66,6 @@ clean:
 logs:
 	@tail -f /tmp/sirracha_debug.log 2>/dev/null || tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"
 
+# Inject into running Sober
+inject:
+	@./scripts/inject_sober.sh
