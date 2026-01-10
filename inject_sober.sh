@@ -111,8 +111,7 @@ if check_success "$GDB_OUTPUT"; then
     exit 0
 fi
 
-# 8. Method 3: GDB (Legacy Fallback - The 'Hail Mary')
-# Always run this if Method 2 failed
+# 8. Method 3: GDB (Legacy Fallback)
 echo "[*] Method 3: GDB (Legacy dlopen)..." | tee -a "$LOGfile"
 GDB_OUTPUT_LEGACY=$(gdb -batch \
     -ex "set sysroot /proc/$TARGET/root" \
@@ -130,12 +129,12 @@ if check_success "$GDB_OUTPUT_LEGACY"; then
     exit 0
 fi
 
-# Final Check logic - maybe it worked but grep failed?
+# Final Verify
 if grep -q "sirracha" "/proc/$TARGET/maps" 2>/dev/null; then
     echo "[SUCCESS] Verified in maps despite GDB output" | tee -a "$LOGfile"
     exit 0
 fi
 
-echo "[ERROR] All methods failed." | tee -a "$LOGfile"
-tail -n 5 "$LOGfile"
+echo "[ERROR] All methods failed. Debug log:"
+cat "$LOGfile"
 exit 1
