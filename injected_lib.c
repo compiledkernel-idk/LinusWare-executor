@@ -211,6 +211,9 @@ static uintptr_t find_libloader_base(void) {
   return base;
 }
 
+// Optimized Assembly Routine
+extern int fast_check_ptr(void *ptr);
+
 typedef struct {
   uintptr_t candidate;
   int score;
@@ -238,7 +241,7 @@ static int score_lua_state_candidate(uintptr_t addr, uintptr_t sober_base) {
   for (int i = 0; i < 6; i++) {
     uintptr_t p = ptrs[i];
 
-    if (p > 0x10000 && p < 0x800000000000UL) {
+    if (fast_check_ptr((void *)p) && p > 0x10000) {
       score += 2;
     }
 

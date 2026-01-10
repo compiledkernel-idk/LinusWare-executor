@@ -31,8 +31,8 @@ all: sirracha_exec.so injector ui-dep
 	@echo ""
 
 # The main injection library (BACKEND)
-sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c luau_api.h roblox_offsets.h
-	$(CC) $(CFLAGS) -shared -o $@ injected_lib.c pattern_scanner.c roblox_state.c $(DL) $(PTHREAD)
+sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c fast_check.s luau_api.h roblox_offsets.h
+	$(CC) $(CFLAGS) -shared -o $@ injected_lib.c pattern_scanner.c roblox_state.c fast_check.s $(DL) $(PTHREAD)
 	@strip --strip-unneeded $@ 2>/dev/null || true
 
 # The CLI/helper injector (OPTIONAL usage)
