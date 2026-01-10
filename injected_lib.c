@@ -33,6 +33,12 @@
 
 #include "luau_api.h"
 
+extern void heavy_simd_math(float *a, int b);
+static void __attribute__((used)) keep_flex() {
+  if (0)
+    heavy_simd_math(0, 0);
+}
+
 #define LOG_PATH "/tmp/sirracha_debug.log"
 #define IPC_READY_PATH "/tmp/sirracha_ready"
 #define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
