@@ -17,6 +17,15 @@ We need to find the **relative memory offsets** (from the start of `libloader.so
 ---
 
 ##  Step 1: Dump the Target Library
+**EASY METHOD:** Run the helper script included in this repo:
+```bash
+./dump_sober.sh
+```
+This will automatically find Sober and create `sober_dump.bin` or `libloader_dump.so` for you.
+
+---
+
+**MANUAL METHOD (If script fails):**
 Sober runs in a Flatpak, and the Roblox code is packed inside `libloader.so` (on x86_64 systems) or increasingly directly inside the main `sober` binary.
 
 1.  **Launch Sober** and enter a game.
