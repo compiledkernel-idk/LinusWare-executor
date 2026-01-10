@@ -3,24 +3,24 @@
 # Copyright (c) 2026 compiledkernel-idk
 # All Rights Reserved.
 #
-# This software is proprietary and confidential. 
-# Unauthorized copying, distribution, or use of this file, 
+# This software is proprietary and confidential.
+# Unauthorized copying, distribution, or use of this file,
 # via any medium, is strictly prohibited.
 
 # Sirracha Executor Makefile
 
-# Sirracha Executor Makefile (Electron UI)
+# Sirracha Executor Makefile (Qt UI)
 
 CC = gcc
+CXX = g++
 CFLAGS = -Wall -O3 -fPIC -ffunction-sections -fdata-sections -s
 LDFLAGS = -Wl,--gc-sections,--strip-all,-z,now,-z,relro
 PTHREAD = -lpthread
 DL = -ldl
-UI_DIR = sirracha-ui
 
-.PHONY: all clean install run ui-dep
+.PHONY: all clean install run qt-ui
 
-all: sirracha_exec.so injector ui-dep
+all: sirracha_exec.so injector qt-ui
 	@cp -f sirracha_exec.so /dev/shm/sirracha.so
 	@chmod 777 /dev/shm/sirracha.so
 	@strip --strip-all sirracha_exec.so 2>/dev/null || true
@@ -39,21 +39,28 @@ sirracha_exec.so: injected_lib.c pattern_scanner.c roblox_state.c simd_utils.s h
 injector: Injector.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ Injector.c $(DL)
 
-# Install UI dependencies
-ui-dep:
-	@if [ ! -d "$(UI_DIR)/node_modules" ]; then \
-		echo "Installing UI dependencies..."; \
-		cd $(UI_DIR) && npm install; \
-	fi
+# Qt UI build
+qt-ui: sirracha-qt
+
+sirracha-qt: SirrachaQt.cpp
+	@echo "Building Qt UI..."
+	@mkdir -p build
+	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && make -j$(nproc) 2>&1 | tail -5
+	@cp build/sirracha-qt . 2>/dev/null || echo "Qt build failed - install Qt5/Qt6 dev packages"
 
 run: all
-	@echo "Launching Sirracha UI..."
-	@./$(UI_DIR)/run.sh
+	@echo "Launching Sirracha Qt UI..."
+	@./sirracha-qt 2>/dev/null || ./sirracha-ui/run.sh
+
+# Legacy Electron UI
+run-electron:
+	@./sirracha-ui/run.sh
 
 clean:
-	rm -f sirracha_exec.so injector sober_test_inject.so
+	rm -f sirracha_exec.so injector sober_test_inject.so sirracha-qt
+	rm -rf build
 	rm -f /dev/shm/sirracha*.so
 	@echo "Clean"
 
 logs:
-	@tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"
+	@tail -f /tmp/sirracha_debug.log 2>/dev/null || tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"

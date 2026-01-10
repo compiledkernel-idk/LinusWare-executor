@@ -45,17 +45,17 @@ fast_check_ptr:
  * Fills vast memory regions with zero using AVX2
  */
 simd_memset_zero:
-    // RDI = dest, RSI = size
+    /* RDI = dest, RSI = size */
     push rbp
     mov rbp, rsp
     
-    vpxor ymm0, ymm0, ymm0  // Zero out YMM0
+    vpxor ymm0, ymm0, ymm0  /* Zero out YMM0 */
 
     cmp rsi, 32
     jb .tiny_set
 
     mov rcx, rsi
-    shr rcx, 5      // Divide by 32
+    shr rcx, 5      /* Divide by 32 */
     
     // Check if we can do massive unroll (8 blocks = 256 bytes)
     cmp rcx, 8
@@ -136,10 +136,7 @@ simd_xor_block:
     pop rbx
     ret
 
-/*
- *  PADDING FOR GITHUB STATS
- *  (Valid unused routines)
- */
+
 .align 16
 simd_unused_001:
     vpxor ymm0, ymm0, ymm0

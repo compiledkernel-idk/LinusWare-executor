@@ -1,0 +1,9 @@
+/home/sultan/sirracha-executor/build/CMakeFiles/sirracha-qt.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/edit_cache.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/rebuild_cache.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/list_install_components.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/install.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/install/local.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/install/strip.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/sirracha-qt_autogen_timestamp_deps.dir
+/home/sultan/sirracha-executor/build/CMakeFiles/sirracha-qt_autogen.dir

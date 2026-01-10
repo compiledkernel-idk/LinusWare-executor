@@ -6,64 +6,112 @@ Roblox script executor for Linux. Targets the Sober client (Flatpak).
 
 | Component | Status |
 |-----------|--------|
-| Injection | Working |
-| Lua State Detection | Working |
-| Function Resolution | Not Working |
-| Script Execution | Not Working |
+| Injection | ✅ Working |
+| Lua State Detection | ✅ Working |
+| Function Resolution | ❌ Needs Offsets |
+| Script Execution | ❌ Blocked |
+
+> **Note:** Script execution is blocked because Sober encrypts its binaries. We need someone to reverse engineer `libloader.so` to find the Luau function offsets. See `EXTREME_DECOMPILING_GUIDE.md`.
 
 ## Requirements
 
-- Linux (tested on Arch Linux, should work on Ubuntu/Debian)
-- GTK4 and GtkSourceView 5
+- Linux (Arch, Ubuntu, Debian, Fedora)
+- Qt5 or Qt6 development libraries
+- GCC/G++ compiler
+- CMake 3.16+
 - Sober (Flatpak Roblox client)
 
 ## Build
 
+### Install Dependencies
+
 ```bash
-# Fedora
-sudo dnf install gtk4-devel gtksourceview5-devel gcc make
+# Arch Linux
+sudo pacman -S qt6-base cmake gcc make
 
 # Ubuntu/Debian  
-sudo apt install libgtk-4-dev libgtksourceview-5-dev gcc make
+sudo apt install qt6-base-dev cmake g++ make
+# OR for Qt5:
+sudo apt install qtbase5-dev cmake g++ make
 
-# Build
+# Fedora
+sudo dnf install qt6-qtbase-devel cmake gcc-c++ make
+```
+
+### Build Everything
+
+```bash
+# Clean build
+make clean
+
+# Build injection library + Qt UI
 make
 
-# Build and run
+# Run the executor
 make run
-
-# View logs
-make logs
-
-# Clean
-make clean
 ```
+
+### Build Commands
+
+| Command | Description |
+|---------|-------------|
+| `make` | Build everything (library, injector, Qt UI) |
+| `make run` | Build and launch Qt UI |
+| `make run-electron` | Run legacy Electron UI |
+| `make logs` | Tail the debug log |
+| `make clean` | Remove all build artifacts |
 
 ## Usage
 
-1. Run `./sirracha`
-2. Click ATTACH (launches Sober if not running)
-3. Wait for "Ready Signal Received"
-4. Enter Lua script
-5. Click EXECUTE
+1. **Start Sober** and join a game
+2. **Run Sirracha**: `make run`
+3. **Click INJECT** - Injects the library into Sober
+4. **Wait for "Connected"** status
+5. **Write your Lua script** in the editor
+6. **Click EXECUTE**
 
-## Files
+## Project Structure
 
 | File | Description |
 |------|-------------|
-| SirrachaUI.c | GTK4 user interface |
-| Injector.c | Process injection via ptrace |
-| injected_lib.c | Library that runs inside Sober |
-| pattern_scanner.c | Memory pattern scanning |
-| roblox_state.c | Roblox structure traversal |
-| luau_api.h | Luau API definitions |
-| roblox_offsets.h | Roblox structure offsets |
+| `SirrachaQt.cpp` | Qt6 user interface (dark theme, syntax highlighting) |
+| `Injector.c` | Process injection via ptrace/GDB |
+| `injected_lib.c` | Library that runs inside Sober |
+| `pattern_scanner.c` | Memory pattern scanning |
+| `roblox_state.c` | Roblox structure traversal |
+| `luau_api.h` | Luau API definitions |
+| `roblox_offsets.h` | Roblox structure offsets |
+| `inject_sober.sh` | Shell injection helper |
+| `find_offsets.py` | Runtime offset discovery tool |
+
+## Troubleshooting
+
+### Qt build fails
+Make sure you have Qt development packages:
+```bash
+# Check Qt version
+qmake --version
+
+# If using Qt5, the build should auto-detect it
+```
+
+### Injection fails
+- Make sure Sober is running and you're in a game
+- Try running with sudo: `sudo ./inject_sober.sh <PID>`
+
+### "Offsets not configured"
+The Luau function offsets need to be found. See `EXTREME_DECOMPILING_GUIDE.md` for instructions on reverse engineering libloader.so.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for technical details and how to help.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for technical details.
+
+### Priority Tasks
+1. **Find Luau offsets** - Reverse engineer `libloader.so` to find `luaL_loadbuffer` and `lua_pcall`
+2. **Pattern signatures** - Create byte patterns that work across Sober updates
+3. **Testing** - Test on different Linux distros
 
 ## License
 
-Copyright (c) 2026 compiledkernel-idk (GitHub) / theterminatorgm (Discord)
+Copyright (c) 2026 compiledkernel-idk (GitHub) / theterminatorgm (Discord)  
 All Rights Reserved.

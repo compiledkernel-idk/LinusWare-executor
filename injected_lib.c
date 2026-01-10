@@ -422,31 +422,41 @@ int resolve_functions(luau_api_t *api) {
 
   // Find libloader.so - this is where Luau functions actually live
   uintptr_t libloader_base = find_libloader_base();
-  log_debug("Sober base: 0x%lx, libloader base: 0x%lx\\n", api->sober_base,
+  log_debug("Sober base: 0x%lx, libloader base: 0x%lx\n", api->sober_base,
             libloader_base);
 
   // Get lua_State from the scan (already done in luau_api_init)
   if (api->L) {
-    log_debug("Using lua_State: %p\\n", (void *)api->L);
+    log_debug("Using lua_State: %p\n", (void *)api->L);
     resolved++;
   }
 
   /*
-   * OLD KNOWN OFFSETS (For Reference / Older Sober Versions)
-   * relative to libloader.so base
+   * OFFSET DISCOVERY STATUS:
    *
-   * #define OFF_LOADBUFFER 0x1846a0
-   * #define OFF_PCALL      0x1846c0
-   * #define OFF_GETGLOBAL  0x184290
-   * #define OFF_SETTOP     0x184d50
-   * #define OFF_PUSHSTRING 0x184b20
-   * #define OFF_TOLSTRING  0x184e90
-   * #define OFF_GETTOP     0x184350
+   * Sober's binaries are fully stripped and encrypted.
+   * Automatic offset discovery failed.
+   *
+   * TO ENABLE EXECUTION:
+   * 1. Dump libloader.so from /proc/PID/root/app/bin/libloader.so
+   * 2. Load into Ghidra
+   * 3. Search for strings like "attempt to call a nil value"
+   * 4. Find luaL_loadbuffer and lua_pcall by tracing code
+   * 5. Update the offsets below and rebuild
+   *
+   * Old candidates (CRASHED - DO NOT USE):
+   * #define OFF_LOADBUFFER 0x46830
+   * #define OFF_PCALL      0x1c400
    */
-  log_debug("Offsets need updating. Check source comments.\\n");
-  resolved = 0;
 
-  log_debug("Resolved %d functions\\n", resolved);
+  // DISABLED - causes crash
+  // api->loadbuffer = (luaL_loadbuffer_t)(libloader_base + 0x46830);
+  // api->pcall = (lua_pcall_t)(libloader_base + 0x1c400);
+
+  log_debug("Offsets not configured - execution disabled\n");
+  log_debug("See EXTREME_DECOMPILING_GUIDE.md for instructions\n");
+
+  log_debug("Resolved %d functions\n", resolved);
   api->functions_resolved = resolved;
   return resolved;
 }
