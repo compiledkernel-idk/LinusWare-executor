@@ -1,4 +1,3 @@
-
 /*
  * Filename: roblox_offsets.h
  *
@@ -14,6 +13,10 @@
 #define ROBLOX_OFFSETS_H
 
 #include <stdint.h>
+
+// Sober Specific Anchors (Relative to sober binary base)
+#define OFF_GLOBALSTATE_ANCHOR 0x586520
+#define OFF_LUA_STATE_ANCHOR 0x6fce08
 
 #define OFF_VISUALENGINE_FAKE_TO_REAL_DATAMODEL 0x1C0
 #define OFF_VISUALENGINE_POINTER 0x7AE30D0

@@ -33,11 +33,11 @@
 
 #include "luau_api.h"
 
-#define LOG_PATH "/tmp/sirracha_debug.log"
-#define IPC_READY_PATH "/tmp/sirracha_ready"
-#define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
-#define IPC_OUT_PATH "/tmp/sirracha_output.txt"
-#define IPC_CMD_PATH "/tmp/sirracha_cmd.txt"
+#define LOG_PATH "/dev/shm/sirracha_debug.log"
+#define IPC_READY_PATH "/dev/shm/sirracha_ready"
+#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
+#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
+#define IPC_CMD_PATH "/dev/shm/sirracha_cmd.txt"
 
 static volatile int g_running = 1;
 static pthread_t g_worker_thread;
@@ -118,6 +118,15 @@ static char *read_script(void) {
 
   size_t read_size = fread(script, 1, fsize, f);
   script[read_size] = '\0';
+
+  // Trim trailing whitespace/newlines
+  while (read_size > 0 &&
+         (script[read_size - 1] == '\n' || script[read_size - 1] == '\r' ||
+          script[read_size - 1] == ' ')) {
+    script[read_size - 1] = '\0';
+    read_size--;
+  }
+
   fclose(f);
   unlink(IPC_EXEC_PATH);
 
@@ -175,7 +184,26 @@ uintptr_t find_sober_base(void) {
     if ((strstr(line, "/sober") || strstr(line, "/app/bin/sober")) &&
         strstr(line, "r-xp")) {
       sscanf(line, "%lx", &base);
-      log_debug("Found Sober base: 0x%lx\n", base);
+      log_debug("Found Sober base: 0x%lx\\n", base);
+      break;
+    }
+  }
+  fclose(maps);
+  return base;
+}
+
+static uintptr_t find_libloader_base(void) {
+  FILE *maps = fopen("/proc/self/maps", "r");
+  if (!maps)
+    return 0;
+
+  char line[512];
+  uintptr_t base = 0;
+
+  while (fgets(line, sizeof(line), maps)) {
+    if (strstr(line, "libloader.so") && strstr(line, "r-xp")) {
+      sscanf(line, "%lx", &base);
+      log_debug("Found libloader.so base: 0x%lx\\n", base);
       break;
     }
   }
@@ -232,6 +260,19 @@ static int score_lua_state_candidate(uintptr_t addr, uintptr_t sober_base) {
 lua_State *find_lua_state(uintptr_t sober_base) {
   if (!sober_base)
     return NULL;
+
+  // Prioritize Sober-specific static anchor
+  uintptr_t static_L = sober_base + OFF_LUA_STATE_ANCHOR;
+  log_debug("Checking static anchor: 0x%lx\n", static_L);
+
+  if (sigsetjmp(g_jmp, 1) == 0) { // Safety first
+    uintptr_t *L_ptr = (uintptr_t *)static_L;
+    if (L_ptr[1] > L_ptr[2] && (L_ptr[1] - L_ptr[2]) < 1000000) {
+      log_debug("Static anchor VALID: %p\n", (void *)static_L);
+      return (lua_State *)static_L;
+    }
+  }
+  log_debug("Static anchor invalid, falling back to full scan...\n");
 
   FILE *maps = fopen("/proc/self/maps", "r");
   if (!maps)
@@ -370,21 +411,35 @@ int resolve_functions(luau_api_t *api) {
 
   int resolved = 0;
 
-  log_debug("Attempting pattern-based function resolution...\n");
-  resolved = scan_and_resolve_functions(api);
+  // Find libloader.so - this is where Luau functions actually live
+  uintptr_t libloader_base = find_libloader_base();
+  log_debug("Sober base: 0x%lx, libloader base: 0x%lx\\n", api->sober_base,
+            libloader_base);
 
-  if (resolved < 3) {
-    log_debug("Pattern scanning found %d functions (not enough)\n", resolved);
-    log_debug(
-        "NOTE: Sober is encrypted - cannot use fallback offsets safely\n");
-    log_debug("Manual offset discovery required via Ghidra/runtime analysis\n");
-
-    api->functions_resolved = resolved;
-    return resolved;
+  // Get lua_State from the scan (already done in luau_api_init)
+  if (api->L) {
+    log_debug("Using lua_State: %p\\n", (void *)api->L);
+    resolved++;
   }
 
+  // If we have libloader, use its offsets
+  if (api->sober_base) {
+    // Use offsets from KNOWN_OFFSETS array - these are sober offsets
+    api->loadbuffer = (luaL_loadbuffer_t)(api->sober_base + 0x1846a0);
+    api->pcall = (lua_pcall_t)(api->sober_base + 0x1846c0);
+    api->getglobal = (lua_getglobal_t)(api->sober_base + 0x1846e0);
+    api->gettop = (lua_gettop_t)(api->sober_base + 0x184920);
+    api->settop = (lua_settop_t)(api->sober_base + 0x184940);
+    api->pushstring = (lua_pushstring_t)(api->sober_base + 0x1849b0);
+    api->tolstring = (lua_tolstring_t)(api->sober_base + 0x180dd0);
+
+    log_debug("loadbuffer at: %p\\n", (void *)api->loadbuffer);
+    log_debug("pcall at: %p\\n", (void *)api->pcall);
+    resolved = 7;
+  }
+
+  log_debug("Resolved %d functions\\n", resolved);
   api->functions_resolved = resolved;
-  log_debug("Resolved %d functions via pattern scanning\n", resolved);
   return resolved;
 }
 
@@ -422,7 +477,7 @@ int execute_script(luau_api_t *api, const char *script, char *output,
     snprintf(output, output_size,
              "ERROR: lua_pcall not found\n"
              "\n"
-             "Cannot execute scripts without pcall function.\\n"
+             "Cannot execute scripts without pcall function.\n"
              "Manual offset discovery required.");
     return -1;
   }
@@ -568,7 +623,7 @@ static void probe_functions(void) {
 void *worker_thread_func(void *arg) {
   (void)arg;
 
-  // Wait for injector to detach and process to stabilize
+  // Brief stabilization delay
   sleep(1);
 
   if (luau_api_init(&g_api) < 0) {
@@ -640,6 +695,72 @@ void *worker_thread_func(void *arg) {
             write_output(
                 "Failed to find DataModel. Offsets may need adjustment.\n"
                 "Check /tmp/sirracha_debug.log for details.");
+          }
+        } else if (strcmp(script, "__DUMP_V2__") == 0) {
+          // Dump Sober's decrypted memory regions for reverse engineering
+          write_output("Dumping Sober's decrypted regions...\n");
+          log_debug("=== MEMORY DUMP REQUESTED ===\n");
+
+          FILE *maps = fopen("/proc/self/maps", "r");
+          if (!maps) {
+            write_output("ERROR: Failed to read memory maps\n");
+            log_debug("Failed to open /proc/self/maps\n");
+          } else {
+            char line[512];
+            int region_count = 0;
+
+            while (fgets(line, sizeof(line), maps)) {
+              uintptr_t start, end;
+              char perms[8];
+              char path[512] = {0};
+              int items = sscanf(line, "%lx-%lx %s %*x %*s %*s %s", &start,
+                                 &end, perms, path);
+
+              size_t size = end - start;
+              int is_sober =
+                  (strstr(line, "/sober") || strstr(line, "/app/bin/sober") ||
+                   strstr(line, "/app/bin/lib"));
+              int is_anon = (items < 4);
+              int is_rx = (perms[2] == 'x');
+
+              if (is_sober || is_rx || (is_anon && size < 100 * 1024 * 1024)) {
+                if (size > 150 * 1024 * 1024)
+                  continue;
+
+                char outpath[256];
+                snprintf(outpath, sizeof(outpath),
+                         "/tmp/sober_dump_0x%lx_%zu_%s.bin", start, size,
+                         perms);
+
+                FILE *outfile = fopen(outpath, "wb");
+                if (outfile) {
+                  chmod(outpath, 0666);
+                  fwrite((void *)start, 1, size, outfile);
+                  fclose(outfile);
+                  region_count++;
+                }
+              }
+            }
+            fclose(maps);
+
+            // EXTRACT LIVE POINTERS FROM L
+            if (g_api.L) {
+              log_debug("Walking live Luau state at %p...\n", (void *)g_api.L);
+              uintptr_t *ptrs = (uintptr_t *)g_api.L;
+              uintptr_t l_g = ptrs[4]; // global_State* is usually at offset 32
+              log_debug("Potential global_State: 0x%lx\n", l_g);
+
+              if (l_g > 0x10000) {
+                // Try to find common function patterns in the vicinity of known
+                // code This will be printed to debug log
+              }
+            }
+
+            log_debug("Dump complete: %d regions written\n", region_count);
+            write_output("✓ Dump complete! %d regions exported.\n"
+                         "Check /tmp/sober_dump_*.bin inside the container.\n\n"
+                         "Use: cp /tmp/sober_dump_*.bin ~/ to analyze.",
+                         region_count);
           }
         } else {
 

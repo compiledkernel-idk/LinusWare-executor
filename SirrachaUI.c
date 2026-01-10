@@ -18,9 +18,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define IPC_READY_PATH "/tmp/sirracha_ready"
-#define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
-#define IPC_OUT_PATH "/tmp/sirracha_output.txt"
+#define IPC_READY_PATH "/dev/shm/sirracha_ready"
+#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
+#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
 #define IPC_LIB_PATH "/dev/shm/sirracha.so"
 
 static GtkWidget *window;
@@ -365,7 +365,7 @@ static void attach_thread(GTask *task, gpointer s, gpointer d,
     for (int i = 0; i < 30; i++) {
       // Check container path via /proc (primary method for Flatpak)
       char *container_ready_path =
-          g_strdup_printf("/proc/%d/root/tmp/sirracha_ready", pid);
+          g_strdup_printf("/proc/%d/root/dev/shm/sirracha_ready", pid);
       if (access(container_ready_path, F_OK) == 0) {
         target_pid = pid;
         g_idle_add((GSourceFunc)set_status, "Attached");

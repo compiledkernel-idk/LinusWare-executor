@@ -1,0 +1,46 @@
+PID 17574 is traced by sober (PID 17578)
+Following tracer chain to parent...
+Found untraced process: PID 17578
+Target PID for injection: 17578
+Staging library for sandbox visibility...
+Staged via /proc/17578/root/tmp
+Using optimized binary injector...
+cp: cannot stat '/tmp/sirracha_1768054173.so': No such file or directory
+
+[!] All injection methods failed
+[!] Try running with sudo: sudo /home/sultan/sirracha-executor/injector 17578 /tmp/sirracha_1768054173.so
+
+╔═══════════════════════════════════════════════════════════╗
+║ SIRRACHA INJECTOR v1.0 ║
+║ Advanced Linux Process Injection Tool ║
+╚═══════════════════════════════════════════════════════════╝
+
+[*] Library found in container filesystem: /tmp/sirracha_1768054173.so
+[*] Target PID: 17578
+[*] Library: /tmp/sirracha_1768054173.so
+
+[*] Using ptrace injection method on PID 17578
+[*] Seccomp status: 2
+[!] Target has seccomp filters, trying alternative...
+
+[*] Trying gdb injection method...
+
+[*] Using gdb injection method on PID 17578
+[*] Running gdb...
+ [New LWP 17580]
+ warning: "target:/app/bin/sober": could not open as an executable file: Input/output error.
+ warning: `target:/app/bin/sober': can't open to read symbols: Input/output error.
+ warning: Could not load vsyscall page because no executable was specified
+ warning: Target and debugger are in different PID namespaces; thread lists and other data are likely unreliable.  Connect to gdbserver inside the container.
+ 0x00007fcf905e8ca1 in ?? ()
+ No symbol table is loaded.  Use the "file" command.
+ [Inferior 1 (process 17578) detached]
+[!] gdb injection may have failed
+
+[*] Trying nsenter injection (for Flatpak)...
+
+[*] Using nsenter injection (for Flatpak/containers)
+[!] Failed to copy library to /tmp
+Binary injector failed (code 1), falling back to GDB...
+nsenter failed, trying direct gdb from host...
+Injection successful (dlopen returned valid pointer)
