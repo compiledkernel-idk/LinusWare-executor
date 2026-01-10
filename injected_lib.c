@@ -33,11 +33,11 @@
 
 #include "luau_api.h"
 
-#define LOG_PATH "/dev/shm/sirracha_debug.log"
-#define IPC_READY_PATH "/dev/shm/sirracha_ready"
-#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
-#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
-#define IPC_CMD_PATH "/dev/shm/sirracha_cmd.txt"
+#define LOG_PATH "/tmp/sirracha_debug.log"
+#define IPC_READY_PATH "/tmp/sirracha_ready"
+#define IPC_EXEC_PATH "/tmp/sirracha_exec.txt"
+#define IPC_OUT_PATH "/tmp/sirracha_output.txt"
+#define IPC_CMD_PATH "/tmp/sirracha_cmd.txt"
 
 static volatile int g_running = 1;
 static pthread_t g_worker_thread;

@@ -6,9 +6,9 @@ const { spawn, execSync } = require('child_process');
 let mainWindow;
 
 // IPC paths
-const IPC_READY_PATH = '/dev/shm/sirracha_ready';
-const IPC_EXEC_PATH = '/dev/shm/sirracha_exec.txt';
-const IPC_OUT_PATH = '/dev/shm/sirracha_output.txt';
+const IPC_READY_PATH = '/tmp/sirracha_ready';
+const IPC_EXEC_PATH = '/tmp/sirracha_exec.txt';
+const IPC_OUT_PATH = '/tmp/sirracha_output.txt';
 
 function createWindow() {
     mainWindow = new BrowserWindow({

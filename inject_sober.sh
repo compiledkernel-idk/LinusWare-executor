@@ -26,16 +26,33 @@ for i in {1..5}; do
     fi
 done
 
-echo "[*] Injecting into PID $TARGET"
+echo "[*] Target PID: $TARGET"
 
-# Inject using the working GDB method
-GDB_OUTPUT=$(gdb -batch \
-    -ex "set sysroot /proc/$TARGET/root" \
-    -ex "attach $TARGET" \
-    -ex "set \$dlopen = (void*(*)(char*, int))dlopen" \
-    -ex "call \$dlopen(\"$LIB_PATH\", 2)" \
-    -ex "detach" \
-    -ex "quit" 2>&1)
+# Stage library for Flatpak visibility
+STAGED_PATH="/tmp/sirracha_injected.so"
+HOST_STAGED_PATH="/proc/$TARGET/root$STAGED_PATH"
+
+echo "[*] Staging library..."
+cp -f "$LIB_PATH" "$HOST_STAGED_PATH" 2>/dev/null || cp -f "$LIB_PATH" "/tmp/sirracha_injected.so"
+chmod 777 "$HOST_STAGED_PATH" 2>/dev/null || chmod 777 "/tmp/sirracha_injected.so"
+
+# Inject using multiple GDB methods
+echo "[*] Attempting injection..."
+
+GDB_CMD="set sysroot /proc/$TARGET/root; attach $TARGET; \
+        call (void*)dlopen(\"$STAGED_PATH\", 2); \
+        detach; quit"
+
+# Try standard dlopen first, then fallback to __libc_dlopen_mode
+GDB_OUTPUT=$(gdb -batch -ex "$GDB_CMD" 2>&1)
+
+if [[ "$GDB_OUTPUT" == *"Invalid data type"* ]] || [[ "$GDB_OUTPUT" == *"No symbol"* ]]; then
+    echo "[!] standard dlopen failed, trying internal __libc_dlopen_mode..."
+    GDB_CMD="set sysroot /proc/$TARGET/root; attach $TARGET; \
+            call (void*)__libc_dlopen_mode(\"$STAGED_PATH\", 2); \
+            detach; quit"
+    GDB_OUTPUT=$(gdb -batch -ex "$GDB_CMD" 2>&1)
+fi
 
 echo "$GDB_OUTPUT" | tail -5
 
@@ -44,5 +61,6 @@ if grep -q "sirracha" "/proc/$TARGET/maps" 2>/dev/null; then
     exit 0
 fi
 
-echo "[ERROR] Injection failed"
+echo "[ERROR] Injection failed. GDB Output:"
+echo "$GDB_OUTPUT"
 exit 1

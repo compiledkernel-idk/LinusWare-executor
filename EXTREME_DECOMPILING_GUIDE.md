@@ -17,21 +17,23 @@ We need to find the **relative memory offsets** (from the start of `libloader.so
 ---
 
 ##  Step 1: Dump the Target Library
-Sober runs in a Flatpak, and the Roblox code is packed inside `libloader.so` (on x86_64 systems) or sometimes the main binary. In Sober, it's confirmed to be `libloader.so`.
+Sober runs in a Flatpak, and the Roblox code is packed inside `libloader.so` (on x86_64 systems) or increasingly directly inside the main `sober` binary.
 
 1.  **Launch Sober** and enter a game.
 2.  **Find the PID**:
     ```bash
     pgrep -f "sober" | head -n 1
     ```
-3.  **Locate the Library**:
+3.  **Locate the Target**:
     ```bash
-    cat /proc/<PID>/maps | grep libloader.so
+    cat /proc/<PID>/maps | grep -E "libloader.so|app/bin/sober"
     ```
-    *Take note of the path, e.g., `/app/bin/libloader.so`.*
+    *If `libloader.so` isn't found, the code is in the main `sober` binary.*
 4.  **Copy it out**:
     ```bash
-    cp /proc/<PID>/root/app/bin/libloader.so ./libloader_dump.so
+    # Try libloader first, then fallback to the main binary
+    cp /proc/<PID>/root/app/bin/libloader.so ./libloader_dump.so 2>/dev/null || \
+    cp /proc/<PID>/root/app/bin/sober ./sober_dump.so
     ```
 
 ---
