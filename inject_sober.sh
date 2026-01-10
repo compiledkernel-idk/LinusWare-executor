@@ -37,7 +37,7 @@ for i in {1..5}; do
     fi
 done
 
-echo "[*] Target PID: $TARGET" | tee -a "$LOGfile"
+echo "[*] Target PID: $TARGET (Original: $ORIG_PID)" | tee -a "$LOGfile"
 
 # 4. Locate Library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,25 +67,28 @@ if [ ! -f "$HOST_STAGED_PATH" ] && [ ! -f "$STAGED_PATH" ]; then
     cp -f "$LIB_PATH" "$HOST_STAGED_PATH" 2>/dev/null || cp -f "$LIB_PATH" "$STAGED_PATH"
 fi
 
-# 6. Method 1: BINARY INJECTOR (Optional, skipped in log usually if ptrace failed)
+# 6. Method 1: BINARY INJECTOR
 if [ -f "$SCRIPT_DIR/injector" ]; then
     echo "[*] Method 1: Binary Injector..." >> "$LOGfile"
     "$SCRIPT_DIR/injector" "$TARGET" "$STAGED_PATH" >> "$LOGfile" 2>&1
-    if [ $? -eq 0 ]; then
+    RET=$?
+    if [ $RET -eq 0 ]; then
         echo "[SUCCESS] Binary injection worked" | tee -a "$LOGfile"
+        rm -f "$HOST_STAGED_PATH" 2>/dev/null
         exit 0
     fi
+    echo "[!] Binary method failed (code $RET)" >> "$LOGfile"
 fi
 
-# 7. Method 2: GDB (Split arguments fix)
+# 7. Method 2: GDB (Explicit Symbols with Trap Protection)
 echo "[*] Method 2: GDB (Explicit Symbols)..." | tee -a "$LOGfile"
 
-# Use multiple -ex to avoid semicolon syntax errors in GDB commands
 GDB_OUTPUT=$(gdb -batch \
     -ex "file /proc/$TARGET/exe" \
     -ex "set sysroot /proc/$TARGET/root" \
     -ex "attach $TARGET" \
     -ex "set confirm off" \
+    -ex "set unwind-on-signal on" \
     -ex "call ((void*(*)(const char*, int))dlopen)(\"$STAGED_PATH\", 2)" \
     -ex "detach" \
     -ex "quit" 2>&1)
@@ -94,29 +97,44 @@ echo "$GDB_OUTPUT" >> "$LOGfile"
 
 if echo "$GDB_OUTPUT" | grep -q "= (void *) 0x[1-9a-f]"; then
     echo "[SUCCESS] GDB (Method 2) worked" | tee -a "$LOGfile"
+    rm -f "$HOST_STAGED_PATH" 2>/dev/null
     exit 0
 fi
 
-# 8. Method 3: GDB (Legacy Fallback - No file command)
-if [[ "$GDB_OUTPUT" == *"Invalid data type"* ]] || [[ "$GDB_OUTPUT" == *"No symbol"* ]] || [[ "$GDB_OUTPUT" == *"No such file"* ]]; then
-    echo "[*] Method 3: GDB (Legacy dlopen)..." | tee -a "$LOGfile"
+if [[ "$GDB_OUTPUT" == *"__libc_dlopen_mode"* ]]; then
+    : # Skip
+else
+    # Try __libc_dlopen_mode in Method 2 context
+    GDB_CMD2="attach $TARGET; set confirm off; set unwind-on-signal on; call ((void*(*)(const char*, int))__libc_dlopen_mode)(\"$STAGED_PATH\", 2); detach; quit"
+    # We re-run gdb completely or just use the output. Let's assume if dlopen failed with type error, this might fix.
+fi
+
+# 8. Method 3: GDB (Legacy Fallback - No file command, Minimal flags)
+# Always try this if Method 2 failed to produce a valid pointer
+echo "[*] Method 3: GDB (Legacy dlopen)..." | tee -a "$LOGfile"
+
+GDB_OUTPUT_LEGACY=$(gdb -batch \
+    -ex "set sysroot /proc/$TARGET/root" \
+    -ex "attach $TARGET" \
+    -ex "set confirm off" \
+    -ex "set unwind-on-signal on" \
+    -ex "call (void*)dlopen(\"$STAGED_PATH\", 2)" \
+    -ex "detach" \
+    -ex "quit" 2>&1)
     
-    GDB_OUTPUT_LEGACY=$(gdb -batch \
-        -ex "set sysroot /proc/$TARGET/root" \
-        -ex "attach $TARGET" \
-        -ex "set confirm off" \
-        -ex "call (void*)dlopen(\"$STAGED_PATH\", 2)" \
-        -ex "detach" \
-        -ex "quit" 2>&1)
-        
-    echo "$GDB_OUTPUT_LEGACY" >> "$LOGfile"
-    
-    if echo "$GDB_OUTPUT_LEGACY" | grep -q "= (void *) 0x[1-9a-f]"; then
-        echo "[SUCCESS] GDB (Method 3) worked" | tee -a "$LOGfile"
-        exit 0
-    fi
+echo "$GDB_OUTPUT_LEGACY" >> "$LOGfile"
+
+if echo "$GDB_OUTPUT_LEGACY" | grep -q "= (void *) 0x[1-9a-f]"; then
+    echo "[SUCCESS] GDB (Method 3) worked" | tee -a "$LOGfile"
+    rm -f "$HOST_STAGED_PATH" 2>/dev/null
+    exit 0
 fi
 
 echo "[ERROR] All methods failed." | tee -a "$LOGfile"
+# Show helpful debug info
+if echo "$GDB_OUTPUT" | grep -q "SIGTRAP"; then
+    echo "[HINT] Process trapped during injection. It might be anti-debug protected or busy." | tee -a "$LOGfile"
+fi
+
 tail -n 5 "$LOGfile"
 exit 1
