@@ -13,6 +13,11 @@ sirracha
 *.o
 *.a
 
+# Memory Dumps
+*_dump*
+sober_dump
+libloader_dump
+
 # Editor artifacts
 .vscode/
 *.swp
