@@ -1,0 +1,24 @@
+# Compiled binaries
+injector
+sirracha
+
+# Shared libraries
+*.so
+
+# Runtime files
+*.log
+*.pid
+
+# Build artifacts
+*.o
+*.a
+
+# Editor artifacts
+.vscode/
+*.swp
+*.swo
+*~
+
+# Debug files
+*.dSYM/
+core
