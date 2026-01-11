@@ -14,7 +14,7 @@
 *.asm linguist-language=Assembly
 
 # Python
-*.py linguist-language=Python
+*.py linguist-detectable=false
 
 # Shell scripts - don't count as main language
 *.sh linguist-detectable=false
