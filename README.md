@@ -29,15 +29,7 @@ LinusWare is a high-performance Roblox script executor designed specifically for
 
 > **Note:** Script execution is currently blocked because Sober encrypts its binaries. See `docs/EXTREME_DECOMPILING_GUIDE.md` for technical details.
 
-## Features
 
-- **Modern Qt UI** - Professional dark theme with syntax highlighting
-- **Multi-method Injection** - Binary injector + GDB fallback
-- **Efficient Memory Usage** - ~270MB RAM footprint
-- **Pattern Scanner** - Advanced memory scanning for Luau functions
-- **SIMD Optimizations** - Assembly-accelerated operations
-- **Open/Save Scripts** - Built-in file management
-- **Keyboard Shortcuts** - F5 to execute, Ctrl+S to save
 
 ## Project Structure
 

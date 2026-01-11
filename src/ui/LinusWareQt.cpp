@@ -11,12 +11,14 @@
 #include <QFontDatabase>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPixmap>
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
@@ -211,6 +213,7 @@ class LinusWareWindow : public QMainWindow {
 
 public:
   LinusWareWindow() {
+    setWindowIcon(QIcon(".github/assets/linusware_logo.png"));
     setWindowTitle("LINUSWARE EXECUTOR");
     setMinimumSize(1000, 650);
     resize(1100, 720);
@@ -230,16 +233,28 @@ public:
     sideLayout->setContentsMargins(0, 0, 0, 0);
 
     QWidget *brand = new QWidget();
-    brand->setFixedHeight(80);
+    brand->setFixedHeight(140);
     QVBoxLayout *brandLayout = new QVBoxLayout(brand);
     brandLayout->setContentsMargins(20, 20, 20, 10);
+    brandLayout->setSpacing(5);
+
+    QLabel *logoIcon = new QLabel();
+    QPixmap pixmap(".github/assets/linusware_logo.png");
+    if (!pixmap.isNull()) {
+      logoIcon->setPixmap(
+          pixmap.scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    logoIcon->setAlignment(Qt::AlignCenter);
+    brandLayout->addWidget(logoIcon);
 
     QLabel *logo = new QLabel("LINUSWARE");
+    logo->setAlignment(Qt::AlignCenter);
     logo->setStyleSheet("font-size: 22px; font-weight: 800; color: #7C3AED; "
                         "letter-spacing: 3px;");
     brandLayout->addWidget(logo);
 
     QLabel *tagline = new QLabel("EXECUTOR ");
+    tagline->setAlignment(Qt::AlignCenter);
     tagline->setStyleSheet(
         "font-size: 10px; color: #4B5563; letter-spacing: 2px;");
     brandLayout->addWidget(tagline);
@@ -365,8 +380,9 @@ public:
                          "-- player.Character.Humanoid.WalkSpeed = 100");
 
     QFont monoFont("Courier New", 10);
-    monoFont.setStyleHint(QFont::TypeWriter); monoFont.setWeight(QFont::Bold);
-    
+    monoFont.setStyleHint(QFont::TypeWriter);
+    monoFont.setWeight(QFont::Bold);
+
     editor->setFont(monoFont);
 
     highlighter = new LuauHighlighter(editor->document());
@@ -762,7 +778,5 @@ int main(int argc, char *argv[]) {
 
   return app.exec();
 }
-
-
 
 #include "LinusWareQt.moc"
