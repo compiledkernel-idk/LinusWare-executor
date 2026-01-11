@@ -26,7 +26,7 @@ libloader_dump
 
 # Debug files
 *.dSYM/
-core
+
 
 # Node dependencies
 node_modules/

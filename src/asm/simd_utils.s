@@ -1,12 +1,6 @@
 /*
  * Filename: simd_utils.s
- *
- * EXTREME SIMD OPTIMIZATION SUITE v2.0
- * TARGET: x86_64 AVX2/SSE4.2
- *
- * This file contains highly optimized, loop-unrolled assembly routines
- * for memory manipulation, pattern scanning, and cryptographic helpers.
- *
+ * 
  * Copyright (c) 2026 compiledkernel-idk
  */
 

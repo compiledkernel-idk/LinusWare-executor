@@ -1,5 +1,5 @@
 /*
- * Filename: SirrachaUI.c
+ * Filename: LinusWareUI.c
  *
  * Copyright (c) 2026 compiledkernel-idk
  * All Rights Reserved.
@@ -18,10 +18,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define IPC_READY_PATH "/dev/shm/sirracha_ready"
-#define IPC_EXEC_PATH "/dev/shm/sirracha_exec.txt"
-#define IPC_OUT_PATH "/dev/shm/sirracha_output.txt"
-#define IPC_LIB_PATH "/dev/shm/sirracha.so"
+#define IPC_READY_PATH "/dev/shm/linusware_ready"
+#define IPC_EXEC_PATH "/dev/shm/linusware_exec.txt"
+#define IPC_OUT_PATH "/dev/shm/linusware_output.txt"
+#define IPC_LIB_PATH "/dev/shm/linusware.so"
 
 static GtkWidget *window;
 static GtkSourceView *source_view;
@@ -157,7 +157,7 @@ static int send_script(const char *script) {
   // Also copy to container's /tmp if we have a target PID
   if (target_pid > 0) {
     char *container_exec_path =
-        g_strdup_printf("/proc/%d/root/tmp/sirracha_exec.txt", target_pid);
+        g_strdup_printf("/proc/%d/root/tmp/linusware_exec.txt", target_pid);
     FILE *cf = fopen(container_exec_path, "w");
     if (cf) {
       fprintf(cf, "%s", script);
@@ -171,7 +171,7 @@ static int send_script(const char *script) {
     // Check container output first
     if (target_pid > 0) {
       char *container_out_path =
-          g_strdup_printf("/proc/%d/root/tmp/sirracha_output.txt", target_pid);
+          g_strdup_printf("/proc/%d/root/tmp/linusware_output.txt", target_pid);
       if (access(container_out_path, F_OK) == 0) {
         g_usleep(50000);
         char *out;
@@ -286,7 +286,7 @@ static gboolean check_lib(pid_t pid) {
   snprintf(path, 64, "/proc/%d/maps", pid);
   char *content;
   if (g_file_get_contents(path, &content, NULL, NULL)) {
-    gboolean found = strstr(content, "sirracha") != NULL;
+    gboolean found = strstr(content, "linusware") != NULL;
     g_free(content);
     return found;
   }
@@ -340,10 +340,10 @@ static void attach_thread(GTask *task, gpointer s, gpointer d,
 
   if (pid > 0) {
     char *log_path =
-        g_strdup_printf("/dev/shm/sirracha_inject_%d.log", getpid());
+        g_strdup_printf("/dev/shm/linusware_inject_%d.log", getpid());
     char *cmd =
         g_strdup_printf("./inject_sober.sh %d > %s 2>&1", pid, log_path);
-    system("cp -f sober_test_inject.so /dev/shm/sirracha.so");
+    system("cp -f sober_test_inject.so /dev/shm/linusware.so");
 
     log_async("Injecting...");
     int ret = system(cmd);
@@ -365,7 +365,7 @@ static void attach_thread(GTask *task, gpointer s, gpointer d,
     for (int i = 0; i < 30; i++) {
       // Check container path via /proc (primary method for Flatpak)
       char *container_ready_path =
-          g_strdup_printf("/proc/%d/root/dev/shm/sirracha_ready", pid);
+          g_strdup_printf("/proc/%d/root/dev/shm/linusware_ready", pid);
       if (access(container_ready_path, F_OK) == 0) {
         target_pid = pid;
         g_idle_add((GSourceFunc)set_status, "Attached");
@@ -560,7 +560,7 @@ static void activate(GtkApplication *app, gpointer d) {
   GtkWidget *about_title = gtk_label_new(NULL);
   gtk_label_set_markup(
       GTK_LABEL(about_title),
-      "<span size='xx-large' weight='bold'>Sirracha Executor</span>");
+      "<span size='xx-large' weight='bold'>LinusWare Executor</span>");
   gtk_box_append(GTK_BOX(about_box), about_title);
 
   GtkWidget *about_version = gtk_label_new("Version PRE_RELEASE");
@@ -585,7 +585,7 @@ static void activate(GtkApplication *app, gpointer d) {
 
 int main(int argc, char **argv) {
   GtkApplication *app =
-      gtk_application_new("com.sirracha.ui", G_APPLICATION_DEFAULT_FLAGS);
+      gtk_application_new("com.linusware.ui", G_APPLICATION_DEFAULT_FLAGS);
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   return g_application_run(G_APPLICATION(app), argc, argv);
 }

@@ -351,8 +351,8 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
     pid = tracer;
   }
   char tmp_lib[256];
-  snprintf(tmp_lib, sizeof(tmp_lib), "/tmp/sirracha_inject_%d.so", getpid());
-  char cp_cmd[512];
+  snprintf(tmp_lib, sizeof(tmp_lib), "/tmp/linusware_inject_%d.so", getpid());
+  char cp_cmd[8192];
   snprintf(cp_cmd, sizeof(cp_cmd), "cp '%s' '%s' && chmod 755 '%s'", lib_path,
            tmp_lib, tmp_lib);
   if (system(cp_cmd) != 0) {
@@ -400,7 +400,7 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
   if (maps) {
     char maps_line[512];
     while (fgets(maps_line, sizeof(maps_line), maps)) {
-      if (strstr(maps_line, "sirracha_inject") ||
+      if (strstr(maps_line, "linusware_inject") ||
           strstr(maps_line, "sober_test")) {
         fclose(maps);
         printf("[+] Library loaded successfully!\n");
@@ -420,7 +420,7 @@ int inject_nsenter(pid_t pid, const char *lib_path) {
 void print_banner() {
   printf("\n");
   printf("╔═══════════════════════════════════════════════════════════╗\n");
-  printf("║ SIRRACHA INJECTOR v1.0 ║\n");
+  printf("║ LINUSWARE INJECTOR v1.0 ║\n");
   printf("║ Advanced Linux Process Injection Tool ║\n");
   printf("╚═══════════════════════════════════════════════════════════╝\n");
   printf("\n");

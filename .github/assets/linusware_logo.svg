@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="darkBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2e2e2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0a0a0a;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="whiteBelly" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e8e8e8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="orangeBeak" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFB84D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8C00;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Enhanced shadow filters -->
+    <filter id="dropShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="8" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="innerShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="2" dy="2"/>
+      <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.3 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Penguin with enhanced shadows -->
+  <g filter="url(#dropShadow)">
+    
+    <!-- Lower body - main cube with shadow details -->
+    <rect x="78" y="110" width="100" height="110" fill="url(#darkBody)" rx="10"/>
+    <!-- Top surface highlight -->
+    <rect x="78" y="110" width="100" height="18" fill="#3a3a3a" opacity="0.7" rx="10"/>
+    <!-- Left edge shadow -->
+    <rect x="78" y="128" width="8" height="92" fill="#000000" opacity="0.3" rx="10"/>
+    <!-- Right edge highlight -->
+    <rect x="170" y="128" width="8" height="92" fill="#4a4a4a" opacity="0.4" rx="10"/>
+    
+    <!-- Belly - white rectangle with depth -->
+    <rect x="96" y="128" width="64" height="82" fill="url(#whiteBelly)" rx="8"/>
+    <!-- Belly inner shadow -->
+    <rect x="96" y="128" width="64" height="10" fill="#d0d0d0" opacity="0.5" rx="8"/>
+    
+    <!-- Head - smaller cube with shadow -->
+    <rect x="88" y="50" width="80" height="70" fill="url(#darkBody)" rx="9"/>
+    <!-- Head top surface -->
+    <rect x="88" y="50" width="80" height="14" fill="#3a3a3a" opacity="0.7" rx="9"/>
+    <!-- Head left shadow -->
+    <rect x="88" y="64" width="8" height="56" fill="#000000" opacity="0.3" rx="9"/>
+    <!-- Head right highlight -->
+    <rect x="160" y="64" width="8" height="56" fill="#4a4a4a" opacity="0.4" rx="9"/>
+    
+    <!-- Eyes - white blocks with depth -->
+    <rect x="102" y="70" width="18" height="22" fill="#ffffff" rx="4"/>
+    <rect x="136" y="70" width="18" height="22" fill="#ffffff" rx="4"/>
+    <!-- Eye shadow tops -->
+    <rect x="102" y="70" width="18" height="4" fill="#e0e0e0" opacity="0.6" rx="4"/>
+    <rect x="136" y="70" width="18" height="4" fill="#e0e0e0" opacity="0.6" rx="4"/>
+    <!-- Pupils -->
+    <rect x="106" y="78" width="10" height="10" fill="#0a0a0a" rx="2"/>
+    <rect x="140" y="78" width="10" height="10" fill="#0a0a0a" rx="2"/>
+    <!-- Eye shine highlights -->
+    <rect x="109" y="80" width="4" height="4" fill="#ffffff" opacity="0.9" rx="1"/>
+    <rect x="143" y="80" width="4" height="4" fill="#ffffff" opacity="0.9" rx="1"/>
+    
+    <!-- Beak - orange with depth -->
+    <polygon points="118,100 138,100 128,112" fill="url(#orangeBeak)"/>
+    <!-- Beak highlight -->
+    <polygon points="120,101 136,101 128,107" fill="#FFD700" opacity="0.5"/>
+    <!-- Beak shadow -->
+    <polygon points="118,100 122,105 128,112" fill="#CC6600" opacity="0.3"/>
+    
+    <!-- Wings - side blocks with shadows -->
+    <!-- Left wing -->
+    <rect x="48" y="130" width="30" height="62" fill="url(#darkBody)" rx="6"/>
+    <rect x="48" y="130" width="30" height="12" fill="#3a3a3a" opacity="0.7" rx="6"/>
+    <rect x="48" y="142" width="6" height="50" fill="#000000" opacity="0.3" rx="6"/>
+    
+    <!-- Right wing -->
+    <rect x="178" y="130" width="30" height="62" fill="url(#darkBody)" rx="6"/>
+    <rect x="178" y="130" width="30" height="12" fill="#3a3a3a" opacity="0.7" rx="6"/>
+    <rect x="202" y="142" width="6" height="50" fill="#4a4a4a" opacity="0.4" rx="6"/>
+    
+    <!-- Feet - orange blocks with depth -->
+    <!-- Left foot -->
+    <rect x="90" y="220" width="30" height="26" fill="url(#orangeBeak)" rx="5"/>
+    <rect x="90" y="220" width="30" height="6" fill="#FFD700" opacity="0.6" rx="5"/>
+    <rect x="90" y="226" width="6" height="20" fill="#CC6600" opacity="0.4" rx="5"/>
+    
+    <!-- Right foot -->
+    <rect x="136" y="220" width="30" height="26" fill="url(#orangeBeak)" rx="5"/>
+    <rect x="136" y="220" width="30" height="6" fill="#FFD700" opacity="0.6" rx="5"/>
+    <rect x="160" y="226" width="6" height="20" fill="#4a4a4a" opacity="0.3" rx="5"/>
+    
+    <!-- Ground shadow -->
+    <ellipse cx="128" cy="246" rx="50" ry="8" fill="#000000" opacity="0.2"/>
+    
+  </g>
+  
+  <!-- Additional ambient occlusion shadows between body parts -->
+  <ellipse cx="128" cy="120" rx="45" ry="8" fill="#000000" opacity="0.15"/>
+  <ellipse cx="63" cy="150" rx="8" ry="20" fill="#000000" opacity="0.1"/>
+  <ellipse cx="193" cy="150" rx="8" ry="20" fill="#000000" opacity="0.1"/>
+</svg>

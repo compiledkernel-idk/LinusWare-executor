@@ -3,7 +3,7 @@
 # Copyright (c) 2026 compiledkernel-idk
 # All Rights Reserved.
 
-# Sirracha Executor Makefile (Qt UI)
+# LinusWare Executor Makefile (Qt UI)
 
 CC = gcc
 CXX = g++
@@ -19,18 +19,18 @@ SRC_UI = src/ui
 
 .PHONY: all clean run qt-ui logs
 
-all: sirracha_exec.so injector qt-ui
-	@cp -f sirracha_exec.so /dev/shm/sirracha.so
-	@chmod 777 /dev/shm/sirracha.so
-	@strip --strip-all sirracha_exec.so 2>/dev/null || true
+all: linusware_exec.so injector qt-ui
+	@cp -f linusware_exec.so /dev/shm/linusware.so
+	@chmod 777 /dev/shm/linusware.so
+	@strip --strip-all linusware_exec.so 2>/dev/null || true
 	@echo "Encrypting binary..."
-	@upx --best --ultra-brute sirracha_exec.so >/dev/null 2>&1 || upx -9 sirracha_exec.so >/dev/null 2>&1 || true
+	#@upx --best --ultra-brute linusware_exec.so >/dev/null 2>&1 || upx -9 linusware_exec.so >/dev/null 2>&1 || true
 	@echo ""
 	@echo "Build complete. Run: make run"
 	@echo ""
 
 # The main injection library (BACKEND)
-sirracha_exec.so: $(SRC_CORE)/injected_lib.c $(SRC_CORE)/pattern_scanner.c $(SRC_CORE)/roblox_state.c $(SRC_ASM)/simd_utils.s $(SRC_ASM)/heavy_math.s
+linusware_exec.so: $(SRC_CORE)/injected_lib.c $(SRC_CORE)/pattern_scanner.c $(SRC_CORE)/roblox_state.c $(SRC_ASM)/simd_utils.s $(SRC_ASM)/heavy_math.s
 	$(CC) $(CFLAGS) -I$(SRC_CORE) -shared -o $@ \
 		$(SRC_CORE)/injected_lib.c \
 		$(SRC_CORE)/pattern_scanner.c \
@@ -45,26 +45,26 @@ injector: src/Injector.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ src/Injector.c $(DL)
 
 # Qt UI build
-qt-ui: sirracha-qt
+qt-ui: linusware-qt
 
-sirracha-qt: $(SRC_UI)/SirrachaQt.cpp
+linusware-qt: $(SRC_UI)/LinusWareQt.cpp
 	@echo "Building Qt UI..."
 	@mkdir -p build
 	@cd build && cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && make -j$$(nproc) 2>&1 | tail -5
-	@cp build/sirracha-qt . 2>/dev/null || echo "Qt build failed - install Qt5/Qt6 dev packages"
+	@cp build/linusware-qt . 2>/dev/null || echo "Qt build failed - install Qt5/Qt6 dev packages"
 
 run: all
-	@echo "Launching Sirracha..."
-	@./sirracha-qt
+	@echo "Launching LinusWare..."
+	@./linusware-qt
 
 clean:
-	rm -f sirracha_exec.so injector sirracha-qt
+	rm -f linusware_exec.so injector linusware-qt
 	rm -rf build
-	rm -f /dev/shm/sirracha*.so
+	rm -f /dev/shm/linusware*.so
 	@echo "Clean"
 
 logs:
-	@tail -f /tmp/sirracha_debug.log 2>/dev/null || tail -f /dev/shm/sirracha_debug.log 2>/dev/null || echo "No log found"
+	@tail -f /tmp/linusware_debug.log 2>/dev/null || tail -f /dev/shm/linusware_debug.log 2>/dev/null || echo "No log found"
 
 # Inject into running Sober
 inject:

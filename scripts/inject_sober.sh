@@ -1,21 +1,29 @@
 #!/bin/bash
 # Filename: inject_sober.sh
 # 
-# Usage: ./inject_sober.sh <PID>
+# Usage: ./inject_sober.sh [PID]
+# If no PID provided, auto-detects Sober
 
-LOGfile="/tmp/sirracha_inject_debug.log"
-echo "--- Injection Started at $(date) ---" > "$LOGfile"
+LOGfile="/tmp/linusware_inject_$$.log"
+echo "--- Injection Started at $(date) ---" > "$LOGfile" 2>/dev/null || LOGfile="/dev/null"
 
 # 1. Elevate to root
 if [ "$EUID" -ne 0 ]; then
-    echo "Elevating to root..." >> "$LOGfile"
     exec pkexec "$0" "$@"
 fi
 
 PID=$1
 if [ -z "$PID" ]; then
-    echo "Usage: $0 <PID>" | tee -a "$LOGfile"
-    exit 1
+    # Auto-detect Sober PID
+    PID=$(pgrep -f "/app/bin/sober" | head -1)
+    if [ -z "$PID" ]; then
+        PID=$(pgrep -f "sober" | head -1)
+    fi
+    if [ -z "$PID" ]; then
+        echo "[-] Sober not running. Start Sober first." | tee -a "$LOGfile"
+        exit 1
+    fi
+    echo "[*] Auto-detected Sober PID: $PID" | tee -a "$LOGfile"
 fi
 
 # 2. Relax Yama
@@ -41,10 +49,10 @@ echo "[*] Target PID: $TARGET (Original: $ORIG_PID)" | tee -a "$LOGfile"
 
 # 4. Locate Library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_PATH="/dev/shm/sirracha.so"
+LIB_PATH="/dev/shm/linusware.so"
 if [ ! -f "$LIB_PATH" ]; then
-    if [ -f "$SCRIPT_DIR/sirracha_exec.so" ]; then
-        LIB_PATH="$SCRIPT_DIR/sirracha_exec.so"
+    if [ -f "$SCRIPT_DIR/linusware_exec.so" ]; then
+        LIB_PATH="$SCRIPT_DIR/linusware_exec.so"
     else
         echo "[ERROR] Library not found." | tee -a "$LOGfile"
         exit 1
@@ -52,7 +60,7 @@ if [ ! -f "$LIB_PATH" ]; then
 fi
 
 # 5. Stage library
-STAGED_NAME="sirracha_$(date +%s).so"
+STAGED_NAME="linusware_$(date +%s).so"
 STAGED_PATH="/dev/shm/$STAGED_NAME"
 HOST_STAGED_PATH="/proc/$TARGET/root$STAGED_PATH"
 
@@ -130,7 +138,7 @@ if check_success "$GDB_OUTPUT_LEGACY"; then
 fi
 
 # Final Verify
-if grep -q "sirracha" "/proc/$TARGET/maps" 2>/dev/null; then
+if grep -q "linusware" "/proc/$TARGET/maps" 2>/dev/null; then
     echo "[SUCCESS] Verified in maps despite GDB output" | tee -a "$LOGfile"
     exit 0
 fi

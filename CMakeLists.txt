@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(SirrachaQt VERSION 1.0 LANGUAGES CXX)
+project(LinusWareQt VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,18 +18,18 @@ endif()
 
 # Source files
 set(SOURCES
-    src/ui/SirrachaQt.cpp
+    src/ui/LinusWareQt.cpp
 )
 
 # Create executable
-add_executable(sirracha-qt ${SOURCES})
+add_executable(linusware-qt ${SOURCES})
 
 # Link Qt
 if(QT_VERSION_MAJOR EQUAL 6)
-    target_link_libraries(sirracha-qt Qt6::Widgets)
+    target_link_libraries(linusware-qt Qt6::Widgets)
 else()
-    target_link_libraries(sirracha-qt Qt5::Widgets)
+    target_link_libraries(linusware-qt Qt5::Widgets)
 endif()
 
 # Install
-install(TARGETS sirracha-qt DESTINATION bin)
+install(TARGETS linusware-qt DESTINATION bin)

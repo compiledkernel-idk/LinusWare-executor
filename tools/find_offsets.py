@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sirracha Offset Finder
+LinusWare Offset Finder
 Scans running Sober process to find Luau API function offsets
 """
 
@@ -138,7 +138,7 @@ def find_function_start(data, base_addr, xref_addr):
 
 def main():
     print("=" * 60)
-    print("SIRRACHA OFFSET FINDER")
+    print("LINUSWARE OFFSET FINDER")
     print("=" * 60)
     
     pid = find_sober_pid()
@@ -240,13 +240,13 @@ def main():
     print("Look for functions near these string references.")
     
     # Write findings to file
-    with open('/tmp/sirracha_offsets_found.txt', 'w') as f:
+    with open('/tmp/linusware_offsets_found.txt', 'w') as f:
         f.write(f"libloader.so base: 0x{libloader_base:x}\n\n")
         f.write("String addresses found:\n")
         for s, addr in all_string_addrs.items():
             f.write(f"  '{s}': 0x{addr:x}\n")
     
-    print("\n[+] Results saved to /tmp/sirracha_offsets_found.txt")
+    print("\n[+] Results saved to /tmp/linusware_offsets_found.txt")
 
 if __name__ == '__main__':
     main()

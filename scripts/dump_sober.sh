@@ -32,17 +32,19 @@ if [ ! -z "$LIB_PATH" ]; then
     fi
 fi
 
-# Fallback: Main Binary (Newer Sober)
-echo "[!] libloader.so not found (likely merged into main binary)."
-echo "[-] Dumping main executable..."
+# Dump Disk Binary
+echo "[-] Dumping main executable (Disk)..."
+cp "/proc/$PID/exe" "./sober_disk.elf"
+echo "[SUCCESS] Dumped disk binary to $(pwd)/sober_disk.elf"
 
-OUT_FILE="sober_dump.bin"
-cp "/proc/$PID/exe" "./$OUT_FILE"
+# Dump RAM Binary (Unpacked)
+echo "[-] Dumping memory segment (RAM)..."
+python3 "$SCRIPT_DIR/dump_ram.py" "$PID" "sober_ram.bin"
 
-if [ $? -eq 0 ]; then
-    echo "[SUCCESS] Dumped main binary to $(pwd)/$OUT_FILE"
-    echo "Now open this file in Ghidra!"
-    exit 0
+if [ -f "sober_ram.bin" ]; then
+    echo "[SUCCESS] Dumped RAM binary to $(pwd)/sober_ram.bin"
+    echo "Use 'sober_ram.bin' if the disk file seems encrypted/packed."
+else
+    echo "[!] RAM dump failed. Try running with sudo."
 fi
 
-echo "[FAIL] Could not dump binary. Try running as root?"
