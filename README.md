@@ -6,7 +6,7 @@
 
 **Luau executor for Sober on Linux**
 
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+
 [![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)](#)
 [![Sober](https://img.shields.io/badge/Sober-Flatpak-green.svg)](#)
 
