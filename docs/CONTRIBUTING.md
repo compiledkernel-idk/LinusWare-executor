@@ -1,4 +1,4 @@
-# Contributing to Sirracha Executor
+# Contributing to LinusWare Executor
 
 ## Project Status: 60% Complete
 
@@ -20,7 +20,7 @@
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   SirrachaUI.c  │────>│   Injector.c     │────>│ injected_lib.c  │
+│   LinusWareUI.c  │────>│   Injector.c     │────>│ injected_lib.c  │
 │   (GTK4 App)    │ IPC │ (ptrace inject)  │     │ (runs in Sober) │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                                           │
@@ -35,7 +35,7 @@
 
 | File | Purpose |
 |------|---------|
-| `SirrachaUI.c` | GTK4 UI with code editor and output panel |
+| `LinusWareUI.c` | GTK4 UI with code editor and output panel |
 | `Injector.c` | Handles ptrace attachment and library loading |
 | `injected_lib.c` | Main library injected into Sober. Runs worker thread. |
 | `pattern_scanner.c` | Scans memory for Luau function patterns |
@@ -135,7 +135,7 @@ Type these in the executor and click Execute:
 | `__SAFEPROBE__` | Scan for function prologues |
 | `__DISCOVER__` | Run aggressive string-based discovery |
 
-Check logs at `/dev/shm/sirracha_debug.log`
+Check logs at `/dev/shm/linusware_debug.log`
 
 ---
 
@@ -145,10 +145,10 @@ Located in `/dev/shm/`:
 
 | File | Purpose |
 |------|---------|
-| `sirracha_exec` | Script to execute (written by UI) |
-| `sirracha_output` | Output from execution (read by UI) |
-| `sirracha_ready` | Ready signal from injected library |
-| `sirracha_debug.log` | Debug log |
+| `linusware_exec` | Script to execute (written by UI) |
+| `linusware_output` | Output from execution (read by UI) |
+| `linusware_ready` | Ready signal from injected library |
+| `linusware_debug.log` | Debug log |
 
 ---
 

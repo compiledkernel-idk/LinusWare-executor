@@ -1,6 +1,6 @@
 # Extreme Decompiling Guide: Finding Luau Offsets for Sober
 
-This guide explains how to reverse engineer the Sober Roblox execution environment ("Sober") to find the critical Luau API offsets required for Sirracha to execute scripts.
+This guide explains how to reverse engineer the Sober Roblox execution environment ("Sober") to find the critical Luau API offsets required for LinusWare to execute scripts.
 
 ##  The Objective
 We need to find the **relative memory offsets** (from the start of `libloader.so`) for these key Luau C functions:
@@ -94,7 +94,7 @@ Onceyou find the function in Ghidra (e.g., `FUN_00123abc`):
 
 ---
 
-##  Step 6: Updating Sirracha
+##  Step 6: Updating LinusWare
 Open `injected_lib.c` and update the `KNOWN_OFFSETS` section:
 
 ```c

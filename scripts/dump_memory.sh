@@ -14,7 +14,7 @@ fi
 echo "[+] Found Sober at PID $SOBER_PID"
 
 # Check if library is already injected
-if grep -q "sirracha" "/proc/$SOBER_PID/maps" 2>/dev/null; then
+if grep -q "linusware" "/proc/$SOBER_PID/maps" 2>/dev/null; then
     echo "[+] Library already injected, sending dump command..."
 else
     echo "[*] Injecting library..."
@@ -31,15 +31,15 @@ fi
 
 # Send dump command
 echo "[*] Requesting memory dump..."
-echo "__DUMP__" > "/proc/$SOBER_PID/root/tmp/sirracha_exec.txt"
+echo "__DUMP__" > "/proc/$SOBER_PID/root/tmp/linusware_exec.txt"
 
 # Wait for dump to complete
 echo "[*] Dumping memory (this may take a few seconds)..."
 sleep 5
 
 # Check output
-if [ -f "/proc/$SOBER_PID/root/tmp/sirracha_output.txt" ]; then
-    cat "/proc/$SOBER_PID/root/tmp/sirracha_output.txt"
+if [ -f "/proc/$SOBER_PID/root/tmp/linusware_output.txt" ]; then
+    cat "/proc/$SOBER_PID/root/tmp/linusware_output.txt"
     echo ""
 fi
 
@@ -72,5 +72,5 @@ if [ -n "$DUMP_FILE" ]; then
     fi
 else
     echo "[!] Dump file not found. Check debug log:"
-    tail -20 "/proc/$SOBER_PID/root/tmp/sirracha_debug.log" 2>/dev/null || echo "No log available"
+    tail -20 "/proc/$SOBER_PID/root/tmp/linusware_debug.log" 2>/dev/null || echo "No log available"
 fi

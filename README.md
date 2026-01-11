@@ -1,6 +1,22 @@
-# Sirracha Executor
+<div align="center">
 
-Roblox script executor for Linux. Targets the Sober client (Flatpak).
+<img src=".github/assets/linusware_logo.png" alt="LinusWare Logo" width="200"/>
+
+# LinusWare Executor
+
+**Luau executor for Sober on Linux**
+
+
+[![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)](#)
+[![Sober](https://img.shields.io/badge/Sober-Flatpak-green.svg)](#)
+
+</div>
+
+---
+
+## About
+
+LinusWare is a high-performance Roblox script executor designed specifically for Linux users running the Sober client. Built with a focus on efficiency and reliability, it features a modern Qt-based interface with advanced process injection capabilities.
 
 ## Status
 
@@ -11,12 +27,14 @@ Roblox script executor for Linux. Targets the Sober client (Flatpak).
 | Function Resolution | ❌ Needs Offsets |
 | Script Execution | ❌ Blocked |
 
-> **Note:** Script execution is blocked because Sober encrypts its binaries. See `docs/EXTREME_DECOMPILING_GUIDE.md`.
+> **Note:** Script execution is currently blocked because Sober encrypts its binaries. See `docs/EXTREME_DECOMPILING_GUIDE.md` for technical details.
+
+
 
 ## Project Structure
 
 ```
-sirracha-executor/
+linusware-executor/
 ├── src/
 │   ├── core/           # Core injection library
 │   │   ├── injected_lib.c
@@ -25,22 +43,17 @@ sirracha-executor/
 │   │   ├── luau_api.h
 │   │   └── roblox_offsets.h
 │   ├── ui/             # User interfaces
-│   │   ├── SirrachaQt.cpp    # Qt UI (active)
-│   │   └── SirrachaUI.c      # GTK UI (legacy)
+│   │   ├── LinusWareQt.cpp
+│   │   └── LinusWareUI.c (legacy)
 │   ├── asm/            # Assembly optimizations
 │   │   ├── simd_utils.s
 │   │   └── heavy_math.s
 │   └── Injector.c      # Process injector
-├── tools/              # Python analysis tools
-│   ├── find_offsets.py
-│   ├── scan_mem.py
-│   └── ...
-├── scripts/            # Shell scripts
-│   ├── inject_sober.sh
-│   └── dump_sober.sh
+├── tools/              # Analysis tools
+├── scripts/            # Injection scripts
 ├── docs/               # Documentation
-│   ├── EXTREME_DECOMPILING_GUIDE.md
-│   └── CONTRIBUTING.md
+├── .github/
+│   └── assets/         # Logos and images
 ├── Makefile
 ├── CMakeLists.txt
 └── README.md
@@ -48,13 +61,12 @@ sirracha-executor/
 
 ## Requirements
 
-- Linux (Arch, Ubuntu, Debian, Fedora)
-- Qt5 or Qt6 development libraries
-- GCC/G++ compiler
-- CMake 3.16+
-- Sober (Flatpak Roblox client)
+- **OS**: Linux (Arch, Ubuntu, Debian, Fedora)
+- **UI**: Qt5 or Qt6 development libraries
+- **Build**: GCC/G++, CMake 3.16+
+- **Target**: Sober (Flatpak Roblox client)
 
-## Build
+## Installation
 
 ### Install Dependencies
 
@@ -72,33 +84,83 @@ sudo dnf install qt6-qtbase-devel cmake gcc-c++ make
 ### Build & Run
 
 ```bash
-make        # Build everything
-make run    # Launch UI
-make inject # Inject into Sober
+make        # Build all components
+make run    # Launch LinusWare UI
+make inject # Direct injection into Sober
 make logs   # View debug logs
-make clean  # Clean build
+make clean  # Clean build artifacts
 ```
 
 ## Usage
 
-1. **Start Sober** and join a game
-2. **Run Sirracha**: `make run`
-3. **Click INJECT**
-4. **Wait for "Connected"**
-5. **Write Lua script** and click **EXECUTE**
+1. **Launch Sober** and join a Roblox game
+2. **Start LinusWare**: `make run` or `./linusware`
+3. **Click INJECT** button
+4. **Wait for "Connected" status**
+5. **Write your Lua script** in the editor
+6. **Press F5 or click EXECUTE**
+
+## Keyboard Shortcuts
+
+- `F5` - Execute script
+- `Ctrl+S` - Save script
+- `Ctrl+O` - Open script
 
 ## Troubleshooting
 
+### "Library not found"
+Ensure `linusware_exec.so` is built:
+```bash
+make linusware_exec.so
+```
+
 ### "Offsets not configured"
-The Luau function offsets need to be found via reverse engineering.
-See `docs/EXTREME_DECOMPILING_GUIDE.md`.
+The Luau function offsets need to be discovered via reverse engineering.  
+See `docs/EXTREME_DECOMPILING_GUIDE.md` for the complete workflow.
 
 ### Qt build fails
+Check your Qt installation:
 ```bash
-qmake --version  # Check Qt version
+qmake --version  # Should show Qt 5.15+ or Qt 6.x
 ```
+
+## Architecture
+
+LinusWare uses a multi-stage injection process:
+
+1. **Binary Injector** - Fast ptrace-based injection
+2. **GDB Fallback** - Alternative method using dlopen
+3. **Memory Scanner** - Pattern-based function discovery
+4. **Lua State Detection** - Heuristic-based VM location
+5. **IPC Communication** - File-based script execution
+
+## Development
+
+### Debug Logs
+
+```bash
+# Real-time log monitoring
+make logs
+
+# Or manually
+tail -f /tmp/linusware_debug.log
+```
+
+### Contributing
+
+Please read `docs/CONTRIBUTING.md` before submitting pull requests.
 
 ## License
 
-Copyright (c) 2026 compiledkernel-idk  
-All Rights Reserved.
+Copyright © 2026 [compiledkernel-idk](https://github.com/compiledkernel-idk)  
+All Rights Reserved. Proprietary Software.
+
+## Disclaimer
+
+This software is for educational purposes only. Use at your own risk.
+
+---
+
+<div align="center">
+Made with ♥ for the Linux community
+</div>
