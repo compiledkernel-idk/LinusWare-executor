@@ -1,0 +1,23 @@
+[package]
+name = "linusware"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[profile.release]
+opt-level = 3
+lto = false
+codegen-units = 16
+strip = true
+
+[profile.dev]
+opt-level = 0
+incremental = true

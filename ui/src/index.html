@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINUSWARE</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+</head>
+
+<body>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <img src="linus-torvalds-middle-finger.jpg" alt="Loading" class="loading-image">
+            <div class="loading-text">LOADING<span id="loading-dots"></span></div>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
+        <aside class="sidebar">
+            <div class="brand">
+                <img src="linusware_logo.png" alt="Logo" class="logo">
+                <h1>LINUSWARE</h1>
+            </div>
+
+            <div class="status-bar">
+                <span class="status-dot" id="status-dot"></span>
+                <span class="status-text" id="status-text">DISCONNECTED</span>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-label">&gt; NAVIGATION</div>
+                <button class="nav-btn active" data-page="editor">EDITOR</button>
+                <button class="nav-btn" data-page="console">CONSOLE</button>
+                <button class="nav-btn" data-page="settings">SETTINGS</button>
+            </nav>
+
+            <div class="caption-section">
+                <img src="caption.gif" alt="Caption" class="caption-gif">
+            </div>
+
+            <div class="commands-section">
+                <div class="nav-label">&gt; COMMANDS</div>
+                <button class="action-btn primary" id="btn-inject">INJECT</button>
+                <button class="action-btn" id="btn-execute">EXECUTE</button>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div class="page active" id="page-editor">
+                <div class="toolbar">
+                    <span class="toolbar-title">SOURCE_CODE</span>
+                    <div class="toolbar-actions">
+                        <button class="tool-btn" id="btn-open">LOAD</button>
+                        <button class="tool-btn" id="btn-save">SAVE</button>
+                        <button class="tool-btn" id="btn-clear">CLR</button>
+                    </div>
+                </div>
+                <div id="editor-container"></div>
+            </div>
+
+            <div class="page" id="page-console">
+                <div class="toolbar">
+                    <span class="toolbar-title">STDOUT_BUFFER</span>
+                    <div class="toolbar-actions">
+                        <button class="tool-btn" id="btn-clear-console">CLR</button>
+                    </div>
+                </div>
+                <div id="console">
+                    <div class="log-line success">[SYSTEM] Ready.</div>
+                </div>
+            </div>
+
+            <div class="page" id="page-settings">
+                <div class="settings-container">
+                    <h2>CONFIGURATION</h2>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-name">AUTO_INJECT</span>
+                            <span class="setting-desc">Inject on process detection</span>
+                        </div>
+                        <button class="toggle-btn" data-setting="auto_inject">0</button>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-name">AUTO_EXEC</span>
+                            <span class="setting-desc">Execute buffer on injection</span>
+                        </div>
+                        <button class="toggle-btn" data-setting="auto_exec">0</button>
+                    </div>
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <span class="setting-name">ALWAYS_ONTOP</span>
+                            <span class="setting-desc">Force window Z-order top</span>
+                        </div>
+                        <button class="toggle-btn" data-setting="always_top">0</button>
+                    </div>
+                    <div class="footer">LINUSWARE // version_UNRELEASED</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

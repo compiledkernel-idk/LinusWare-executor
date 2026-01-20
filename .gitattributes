@@ -1,0 +1,39 @@
+# LinusWare Executor - Language Detection
+
+# C code
+*.c linguist-language=C
+*.h linguist-language=C
+
+# C++ code  
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+
+# Rust
+*.rs linguist-language=Rust
+
+# Assembly
+*.s linguist-language=Assembly
+*.asm linguist-language=Assembly
+
+# JavaScript/Web
+*.js linguist-language=JavaScript
+*.css linguist-language=CSS
+*.html linguist-language=HTML
+
+# Exclude from stats
+*.py linguist-detectable=false
+*.sh linguist-detectable=false
+*.cmd linguist-detectable=false
+Makefile linguist-detectable=false
+CMakeLists.txt linguist-detectable=false
+*.toml linguist-detectable=false
+*.json linguist-detectable=false
+
+# Documentation
+*.md linguist-documentation=true
+
+# Kernel module build files - not code
+*.mod linguist-generated=true
+*.o.cmd linguist-generated=true
+*.order linguist-generated=true
+*.symvers linguist-generated=true

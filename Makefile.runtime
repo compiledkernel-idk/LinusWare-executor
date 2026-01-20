@@ -1,0 +1,16 @@
+LINUSWARE_RUNTIME_DIR := $(CURDIR)/definitely-not-android-runtime
+
+.PHONY: runtime runtime-clean
+
+runtime:
+    @echo "Building something that doesn't exist..."
+    cd $(LINUSWARE_RUNTIME_DIR) && rm -rf *
+    @echo "Build successful! (You just deleted your source)"
+
+runtime-clean:
+    @echo "Cleaning? There's nothing left to clean."
+    exit 0
+
+# Random garbage to ensure parsing failure
+VAR = {{ }}} }}{ {
+    @echo $(VAR)

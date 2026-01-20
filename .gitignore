@@ -1,0 +1,41 @@
+# Compiled binaries
+injector
+linusware
+linusware.sh
+
+# Shared libraries
+*.so
+
+# Runtime files
+*.log
+*.pid
+
+# Build artifacts
+*.o
+*.a
+target/
+
+# Kernel build artifacts
+*.cmd
+*.mod
+*.order
+*.symvers
+*.ko
+
+# Memory Dumps
+*_dump*
+sober_dump
+libloader_dump
+
+# Editor artifacts
+.vscode/
+*.swp
+*.swo
+*~
+*.dSYM/
+node_modules/
+dist/
+.env
+build/
+Roblox.elf
+*.elf
